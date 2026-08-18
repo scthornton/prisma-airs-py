@@ -9,6 +9,10 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- Service clients for every plane: `ManagementClient`, `AIGatewayClient`,
+  `AIGatewayAdminClient`, `RedTeamClient`, `ModelSecurityClient`, and `DlpClient`, all
+  exported from `prisma_airs`. Each shares one OAuth token cache and one connection pool
+  across its sub-clients.
 - Pydantic models for every remaining API plane: management, AI gateway, red teaming,
   model security, and DLP, plus shared enums and error shapes. Namespaced by domain under
   `prisma_airs.models`.

@@ -11,6 +11,9 @@ Example:
 from __future__ import annotations
 
 from prisma_airs._version import __version__
+from prisma_airs.ai_gateway.ai_gateway_admin import AIGatewayAdminClient
+from prisma_airs.ai_gateway.ai_gateway_core import AIGatewayClient
+from prisma_airs.dlp.dlp import DlpClient
 from prisma_airs.errors import (
     AISecClientError,
     AISecMissingVariableError,
@@ -22,6 +25,8 @@ from prisma_airs.errors import (
     ErrorType,
     FailureKind,
 )
+from prisma_airs.management.management import ManagementClient
+from prisma_airs.model_security.model_security import ModelSecurityClient
 from prisma_airs.models.scan import (
     AiProfile,
     AsyncScanObject,
@@ -34,9 +39,12 @@ from prisma_airs.models.scan import (
     ThreatScanReport,
     ToolEvent,
 )
+from prisma_airs.red_team.red_team_core import RedTeamClient
 from prisma_airs.scan.scanner import Scanner
 
 __all__ = [
+    "AIGatewayAdminClient",
+    "AIGatewayClient",
     "AISecClientError",
     "AISecMissingVariableError",
     "AISecOAuthError",
@@ -48,9 +56,13 @@ __all__ = [
     "AsyncScanObject",
     "AsyncScanResponse",
     "Content",
+    "DlpClient",
     "ErrorType",
     "FailureKind",
+    "ManagementClient",
     "Metadata",
+    "ModelSecurityClient",
+    "RedTeamClient",
     "ScanIdResult",
     "ScanRequest",
     "ScanResponse",
