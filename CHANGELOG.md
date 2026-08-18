@@ -9,6 +9,12 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- Pydantic models for every remaining API plane: management, AI gateway, red teaming,
+  model security, and DLP, plus shared enums and error shapes. Namespaced by domain under
+  `prisma_airs.models`.
+- `airs config` command group: `set`, `get`, `unset`, `list`, and `path`.
+- Resumable bulk-scan state and an advisory lock, with on-disk formats interchangeable
+  with the TypeScript CLI's.
 - `Scanner` client for the AI Runtime Security scan API: `scan`, `sync_scan`,
   `async_scan`, `query_by_scan_ids`, and `query_by_report_ids`, with regional endpoint
   selection.
