@@ -107,6 +107,9 @@ docstring-code-format = true
 [tool.mypy]
 python_version = "3.10"
 strict = true
+# Without this, mypy synthesises model __init__ from aliases alone and rejects
+# construction by field name, even where populate_by_name allows it at runtime.
+plugins = ["pydantic.mypy"]
 warn_unreachable = true
 warn_no_return = true
 disallow_any_generics = true
