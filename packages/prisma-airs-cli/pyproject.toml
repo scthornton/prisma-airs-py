@@ -1,0 +1,47 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "prisma-airs-cli"
+version = "0.1.0"
+description = "Command-line interface for Palo Alto Networks Prisma AIRS"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { file = "LICENSE" }
+authors = [{ name = "Scott Thornton", email = "scthornton@gmail.com" }]
+keywords = ["prisma-airs", "palo-alto-networks", "ai-security", "cli", "red-teaming"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Information Technology",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Security",
+    "Typing :: Typed",
+]
+
+dependencies = [
+    "prisma-airs-sdk",
+    "typer>=0.15",
+    "rich>=13.9",
+    "questionary>=2.0",
+    "pydantic-settings>=2.7",
+    "pyyaml>=6.0",
+]
+
+[project.scripts]
+airs = "prisma_airs_cli.__main__:main"
+
+[project.urls]
+Homepage = "https://github.com/scthornton/prisma-airs-py"
+Repository = "https://github.com/scthornton/prisma-airs-py"
+Issues = "https://github.com/scthornton/prisma-airs-py/issues"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/prisma_airs_cli"]
