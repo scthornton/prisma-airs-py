@@ -1,0 +1,42 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "prisma-airs-sdk"
+version = "0.1.0"
+description = "Python SDK for Palo Alto Networks Prisma AIRS: runtime scanning, management, AI gateway, red teaming, and model security"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { file = "LICENSE" }
+authors = [{ name = "Scott Thornton", email = "scthornton@gmail.com" }]
+keywords = ["prisma-airs", "palo-alto-networks", "ai-security", "llm-security", "prompt-injection"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Information Technology",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Security",
+    "Typing :: Typed",
+]
+
+# Deliberately minimal. The SDK is meant to drop into notebooks and test suites
+# that already carry their own dependency weight, so it asks for nothing beyond
+# an HTTP client and a validation layer.
+dependencies = [
+    "httpx>=0.27",
+    "pydantic>=2.9",
+]
+
+[project.urls]
+Homepage = "https://github.com/scthornton/prisma-airs-py"
+Repository = "https://github.com/scthornton/prisma-airs-py"
+Issues = "https://github.com/scthornton/prisma-airs-py/issues"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/prisma_airs"]

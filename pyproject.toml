@@ -1,0 +1,142 @@
+# Workspace root. This project is virtual -- it is never built or published;
+# it exists to pin shared tooling and to hold configuration common to both
+# distributions under packages/.
+
+[project]
+name = "prisma-airs-py"
+version = "0.0.0"
+description = "Development workspace for the Prisma AIRS Python SDK and CLI"
+requires-python = ">=3.10"
+dependencies = [
+    "prisma-airs-sdk",
+    "prisma-airs-cli",
+]
+
+[tool.uv]
+package = false
+
+[tool.uv.workspace]
+members = ["packages/*"]
+
+[tool.uv.sources]
+prisma-airs-sdk = { workspace = true }
+prisma-airs-cli = { workspace = true }
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3",
+    "pytest-cov>=6.0",
+    "pytest-asyncio>=0.25",
+    "respx>=0.22",
+    "mypy>=1.14",
+    "ruff>=0.9",
+    "pre-commit>=4.0",
+]
+
+# ---------------------------------------------------------------------------
+# Linting and formatting
+# ---------------------------------------------------------------------------
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+src = ["packages/prisma-airs-sdk/src", "packages/prisma-airs-cli/src"]
+
+[tool.ruff.lint]
+select = [
+    "E", "W",    # pycodestyle
+    "F",         # pyflakes
+    "I",         # isort
+    "N",         # pep8-naming
+    "UP",        # pyupgrade
+    "B",         # bugbear
+    "A",         # shadowed builtins
+    "C4",        # comprehensions
+    "C90",       # mccabe complexity
+    "DTZ",       # timezone-aware datetimes
+    "T20",       # no bare print (output goes through Rich)
+    "SIM",       # simplify
+    "RET",       # return consistency
+    "ARG",       # unused arguments
+    "PTH",       # prefer pathlib
+    "TID",       # tidy imports
+    "ERA",       # commented-out code
+    "PL",        # pylint subset
+    "S",         # bandit security checks
+    "ASYNC",     # async correctness
+    "RUF",       # ruff-specific
+    "D",         # docstrings
+]
+ignore = [
+    "D107",     # __init__ docstring lives on the class
+    "D203",     # incompatible with D211
+    "D213",     # incompatible with D212
+    "PLR0913",  # API clients legitimately take many keyword arguments
+]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.lint.flake8-tidy-imports]
+ban-relative-imports = "parents"
+
+[tool.ruff.lint.mccabe]
+max-complexity = 12
+
+[tool.ruff.lint.per-file-ignores]
+"**/tests/**" = [
+    "S101",     # assert is the point of a test
+    "D",        # tests document themselves through naming
+    "PLR2004",  # magic values are fine in assertions
+    "ARG",      # fixtures are often injected but unused
+]
+"**/__init__.py" = ["D104", "F401"]
+
+[tool.ruff.format]
+docstring-code-format = true
+
+# ---------------------------------------------------------------------------
+# Type checking
+# ---------------------------------------------------------------------------
+
+[tool.mypy]
+python_version = "3.10"
+strict = true
+warn_unreachable = true
+warn_no_return = true
+disallow_any_generics = true
+no_implicit_reexport = true
+show_error_codes = true
+pretty = true
+
+[[tool.mypy.overrides]]
+module = ["tests.*", "*.tests.*"]
+disallow_untyped_defs = false
+
+# ---------------------------------------------------------------------------
+# Testing
+# ---------------------------------------------------------------------------
+
+[tool.pytest.ini_options]
+minversion = "8.0"
+testpaths = ["packages/prisma-airs-sdk/tests", "packages/prisma-airs-cli/tests"]
+addopts = "-ra --strict-markers --strict-config"
+asyncio_mode = "auto"
+markers = [
+    "live: exercises the real Prisma AIRS API; requires credentials (deselect with -m 'not live')",
+    "parity: compares behaviour against the TypeScript reference implementation",
+]
+
+[tool.coverage.run]
+branch = true
+source = ["prisma_airs", "prisma_airs_cli"]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = true
+exclude_lines = [
+    "pragma: no cover",
+    "if TYPE_CHECKING:",
+    "raise NotImplementedError",
+    "@overload",
+]
