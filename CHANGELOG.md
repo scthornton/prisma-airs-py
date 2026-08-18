@@ -9,6 +9,16 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- `Scanner` client for the AI Runtime Security scan API: `scan`, `sync_scan`,
+  `async_scan`, `query_by_scan_ids`, and `query_by_report_ids`, with regional endpoint
+  selection.
+- Pydantic models for the scan request, verdict, and threat report surfaces.
+- HTTP transport core: retry policy with full jitter, OAuth2 token management with
+  single-flight refresh, and API key, bearer, and tenant-header auth strategies.
+- `airs runtime scan`, which exits 0 on `allow`, 1 on any other verdict, and 2 when the
+  scan could not be completed.
+- Config file support at `~/.prisma-airs/config.json`, resolved behind flags and
+  environment variables.
 - Two-package uv workspace: `prisma-airs-sdk` (library) and `prisma-airs-cli` (`airs`
   command).
 - Project tooling: Ruff lint and format, Mypy in strict mode, pytest with layered test

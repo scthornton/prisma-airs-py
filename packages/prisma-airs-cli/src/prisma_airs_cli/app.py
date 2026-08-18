@@ -12,6 +12,7 @@ from typing import Annotated
 import typer
 
 from prisma_airs_cli import __version__
+from prisma_airs_cli.commands.runtime import runtime_app
 
 app = typer.Typer(
     name="airs",
@@ -19,6 +20,8 @@ app = typer.Typer(
     no_args_is_help=True,
     context_settings={"help_option_names": ["-h", "--help"]},
 )
+
+app.add_typer(runtime_app)
 
 
 def _version_callback(value: bool) -> None:
