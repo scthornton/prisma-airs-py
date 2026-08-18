@@ -85,12 +85,17 @@ max-complexity = 12
 
 [tool.ruff.lint.per-file-ignores]
 "**/tests/**" = [
-    "S101",     # assert is the point of a test
-    "D",        # tests document themselves through naming
-    "PLR2004",  # magic values are fine in assertions
-    "ARG",      # fixtures are often injected but unused
+    "S101",              # assert is the point of a test
+    "S105", "S106", "S107",  # fixture credentials are fake by construction
+    "D",                 # tests document themselves through naming
+    "PLR2004",           # magic values are fine in assertions
+    "ARG",               # fixtures are often injected but unused
 ]
 "**/__init__.py" = ["D104", "F401"]
+# S105 flags any constant whose name contains "token". This module holds only public
+# endpoint URLs, header names, and environment variable names -- no credential is ever
+# stored here, and gitleaks scans the repository as a whole.
+"**/constants.py" = ["S105"]
 
 [tool.ruff.format]
 docstring-code-format = true
