@@ -59,9 +59,17 @@ class TestEnumVocabularies:
     def test_error_status_values(self) -> None:
         assert {member.value for member in ErrorStatus} == {"error", "timeout"}
 
-    def test_interpolating_a_member_does_not_yield_its_wire_value(self) -> None:
-        """The ``str`` mixin covers comparison, not rendering: use ``.value`` on the wire."""
-        assert f"{Action.BLOCK}" == "Action.BLOCK"
+    def test_rendering_a_member_yields_its_wire_value(self) -> None:
+        """Guards a real portability trap, not a style preference.
+
+        A plain ``(str, Enum)`` renders as the value on Python 3.10 but as
+        ``Action.BLOCK`` from 3.11, because 3.11 changed ``Enum.__format__`` for mixin
+        enums. These values go into URLs and query strings, so the same code would send
+        different text depending on the interpreter. ``WireEnum`` pins all three forms.
+        """
+        assert f"{Action.BLOCK}" == "block"
+        assert str(Action.BLOCK) == "block"
+        assert "{}".format(Action.BLOCK) == "block"  # noqa: UP032 - format() is the point
         assert Action.BLOCK.value == "block"
         assert json.dumps({"action": Action.BLOCK}) == '{"action": "block"}'
 
