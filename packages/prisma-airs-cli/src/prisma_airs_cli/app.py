@@ -12,6 +12,7 @@ from typing import Annotated
 import typer
 
 from prisma_airs_cli import __version__
+from prisma_airs_cli.commands.config import config_app
 from prisma_airs_cli.commands.runtime import runtime_app
 
 app = typer.Typer(
@@ -22,6 +23,7 @@ app = typer.Typer(
 )
 
 app.add_typer(runtime_app)
+app.add_typer(config_app)
 
 
 def _version_callback(value: bool) -> None:

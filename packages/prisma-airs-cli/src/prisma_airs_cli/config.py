@@ -24,7 +24,7 @@ KNOWN_KEYS: Final[tuple[str, ...]] = (
 )
 
 #: Config keys that may also be supplied through the environment.
-_ENV_OVERRIDES: Final[dict[str, str]] = {
+ENV_OVERRIDES: Final[dict[str, str]] = {
     "profile": "PANW_AI_SEC_PROFILE",
     "region": "PANW_AI_SEC_REGION",
     "endpoint": "PANW_AI_SEC_API_ENDPOINT",
@@ -94,7 +94,7 @@ def resolve(
     if flag_value is not None:
         return flag_value
 
-    env_name = _ENV_OVERRIDES.get(key)
+    env_name = ENV_OVERRIDES.get(key)
     if env_name:
         env_value = os.environ.get(env_name)
         if env_value:
