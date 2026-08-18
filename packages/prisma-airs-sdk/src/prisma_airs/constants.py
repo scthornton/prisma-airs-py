@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from typing import Final
 
-from prisma_airs import __version__
+from prisma_airs._version import __version__
 
 # ---------------------------------------------------------------------------
 # Headers
