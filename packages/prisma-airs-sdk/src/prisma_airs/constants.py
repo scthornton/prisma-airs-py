@@ -88,6 +88,7 @@ DEFAULT_MGMT_ENDPOINT: Final = "https://api.sase.paloaltonetworks.com/aisec"
 DEFAULT_TOKEN_ENDPOINT: Final = "https://auth.apps.paloaltonetworks.com/oauth2/access_token"
 
 ENV_PREFIX_MGMT: Final = "PANW_MGMT"
+ENV_MGMT_ENDPOINT: Final = "PANW_MGMT_ENDPOINT"
 
 MGMT_PROFILE_PATH: Final = "/v1/mgmt/profile"
 MGMT_PROFILES_TSG_PATH: Final = "/v1/mgmt/profiles/tsg"
@@ -132,6 +133,8 @@ DEFAULT_MODEL_SEC_DATA_ENDPOINT: Final = "https://api.sase.paloaltonetworks.com/
 DEFAULT_MODEL_SEC_MGMT_ENDPOINT: Final = "https://api.sase.paloaltonetworks.com/aims/mgmt"
 
 ENV_PREFIX_MODEL_SEC: Final = "PANW_MODEL_SEC"
+ENV_MODEL_SEC_DATA_ENDPOINT: Final = "PANW_MODEL_SEC_DATA_ENDPOINT"
+ENV_MODEL_SEC_MGMT_ENDPOINT: Final = "PANW_MODEL_SEC_MGMT_ENDPOINT"
 
 MODEL_SEC_SCANS_PATH: Final = "/v1/scans"
 MODEL_SEC_EVALUATIONS_PATH: Final = "/v1/evaluations"
@@ -157,6 +160,9 @@ DEFAULT_RED_TEAM_NETWORK_BROKER_ENDPOINT: Final = (
 )
 
 ENV_PREFIX_RED_TEAM: Final = "PANW_RED_TEAM"
+ENV_RED_TEAM_DATA_ENDPOINT: Final = "PANW_RED_TEAM_DATA_ENDPOINT"
+ENV_RED_TEAM_MGMT_ENDPOINT: Final = "PANW_RED_TEAM_MGMT_ENDPOINT"
+ENV_RED_TEAM_NETWORK_BROKER_ENDPOINT: Final = "PANW_RED_TEAM_NETWORK_BROKER_ENDPOINT"
 
 RED_TEAM_SCAN_PATH: Final = "/v1/scan"
 RED_TEAM_CATEGORIES_PATH: Final = "/v1/categories"
@@ -196,6 +202,8 @@ DEFAULT_AI_GW_DATA_ENDPOINT: Final = "https://api.apps.paloaltonetworks.com/ai_g
 DEFAULT_AI_GW_ADMIN_ENDPOINT: Final = "https://api.apps.paloaltonetworks.com/ai_gw/admin/v2"
 
 ENV_PREFIX_AI_GW: Final = "PANW_AI_GW"
+ENV_AI_GW_DATA_ENDPOINT: Final = "PANW_AI_GW_DATA_ENDPOINT"
+ENV_AI_GW_ADMIN_ENDPOINT: Final = "PANW_AI_GW_ADMIN_ENDPOINT"
 
 AI_GW_WORKSPACES_PATH: Final = "/workspaces"
 AI_GW_CONFIGS_PATH: Final = "/configs"
