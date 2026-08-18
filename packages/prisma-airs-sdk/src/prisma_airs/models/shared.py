@@ -12,24 +12,23 @@ turn a parseable response into a ``ValidationError`` -- the same failure mode
 comparing a raw response field against a member still works, as in
 ``scan_response.action == Action.BLOCK``.
 
-The mixin covers comparison, not rendering. ``str(Action.BLOCK)`` and ``f"{Action.BLOCK}"``
-both produce ``"Action.BLOCK"``, not ``"block"``, so reach for ``.value`` when
-interpolating a member into a request payload or a log line. Serialisation is the
-exception: ``json.dumps`` writes the underlying ``str``.
+Every enum here derives from :class:`~prisma_airs.models.base.WireEnum`, so rendering a
+member yields the wire value on every supported Python: ``str(Action.BLOCK)`` and
+``f"{Action.BLOCK}"`` both produce ``"block"``. That is deliberate. A plain ``(str, Enum)``
+renders as ``"block"`` on Python 3.10 and ``"Action.BLOCK"`` from 3.11, which quietly sends
+different text depending on the interpreter.
 """
 
 from __future__ import annotations
 
-from enum import Enum
-
-from prisma_airs.models.base import AirsModel
+from prisma_airs.models.base import AirsModel, WireEnum
 
 # ---------------------------------------------------------------------------
 # Enums
 # ---------------------------------------------------------------------------
 
 
-class Verdict(str, Enum):
+class Verdict(WireEnum):
     """What a single detection service concluded about a piece of content.
 
     Carried on the per-service rows of a threat report, such as
@@ -41,7 +40,7 @@ class Verdict(str, Enum):
     UNKNOWN = "unknown"
 
 
-class Action(str, Enum):
+class Action(WireEnum):
     """What the service instructs the caller to do with the scanned content."""
 
     ALLOW = "allow"
@@ -51,7 +50,7 @@ class Action(str, Enum):
     """Record the finding and let the content through. An alert is not a block."""
 
 
-class Category(str, Enum):
+class Category(WireEnum):
     """The scan's top-level classification, returned on ``ScanResponse.category``.
 
     The members duplicate :class:`Verdict` today. They stay separate types because the
@@ -65,7 +64,7 @@ class Category(str, Enum):
     UNKNOWN = "unknown"
 
 
-class DetectionServiceName(str, Enum):
+class DetectionServiceName(WireEnum):
     """Detection services that can report a finding.
 
     The values match the boolean flag names on ``PromptDetected``, ``ResponseDetected``,
@@ -101,7 +100,7 @@ class DetectionServiceName(str, Enum):
     """Contextual grounding: the response was not supported by the supplied context."""
 
 
-class ContentErrorType(str, Enum):
+class ContentErrorType(WireEnum):
     """Which side of an exchange a per-content error came from.
 
     Populates ``ContentError.content_type`` in :mod:`prisma_airs.models.scan`.
@@ -111,7 +110,7 @@ class ContentErrorType(str, Enum):
     RESPONSE = "response"
 
 
-class ErrorStatus(str, Enum):
+class ErrorStatus(WireEnum):
     """How a detection service failed on one piece of content.
 
     Populates ``ContentError.status``. A timeout is not a clean bill of health: the

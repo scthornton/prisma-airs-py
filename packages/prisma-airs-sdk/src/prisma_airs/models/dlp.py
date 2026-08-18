@@ -11,12 +11,11 @@ needs a dedicated serialiser -- see :class:`MergePatchRequest`.
 
 from __future__ import annotations
 
-from enum import Enum
 from typing import Annotated, Any, Generic, Literal, TypeVar
 
 from pydantic import Field
 
-from prisma_airs.models.base import AirsModel
+from prisma_airs.models.base import AirsModel, WireEnum
 
 # ---------------------------------------------------------------------------
 # Shared building blocks
@@ -110,7 +109,7 @@ class Page(AirsModel, Generic[_ItemT]):
 # ---------------------------------------------------------------------------
 
 
-class DataPatternType(str, Enum):
+class DataPatternType(WireEnum):
     """Top-level taxonomy for a data pattern."""
 
     PREDEFINED = "predefined"
@@ -118,7 +117,7 @@ class DataPatternType(str, Enum):
     FILE_PROPERTY = "file_property"
 
 
-class DataPatternTechnique(str, Enum):
+class DataPatternTechnique(WireEnum):
     """Detection technique used by a pattern.
 
     The same thirteen values appear on :class:`RuleItemDetectionTechnique` and
@@ -141,7 +140,7 @@ class DataPatternTechnique(str, Enum):
     DOCUMENT_CLASSIFIER = "document_classifier"
 
 
-class DataPatternConfidenceLevel(str, Enum):
+class DataPatternConfidenceLevel(WireEnum):
     """Confidence level supported by a pattern."""
 
     LOW = "low"
@@ -149,7 +148,7 @@ class DataPatternConfidenceLevel(str, Enum):
     HIGH = "high"
 
 
-class DataPatternLicenseType(str, Enum):
+class DataPatternLicenseType(WireEnum):
     """License tier the pattern is gated behind."""
 
     STANDARD = "standard"
@@ -157,7 +156,7 @@ class DataPatternLicenseType(str, Enum):
     ESSENTIALS = "essentials"
 
 
-class DataPatternStatus(str, Enum):
+class DataPatternStatus(WireEnum):
     """Lifecycle status of a pattern.
 
     ``SILENT`` patterns still evaluate but do not raise findings, which is how a pattern gets
@@ -171,7 +170,7 @@ class DataPatternStatus(str, Enum):
     SILENT = "silent"
 
 
-class ComparisonOperatorType(str, Enum):
+class ComparisonOperatorType(WireEnum):
     """Comparison operator used by metadata-criterion entries on matching rules."""
 
     LESS_THAN = "less_than"
@@ -289,7 +288,7 @@ class PageDataPatternResponse(Page[DataPatternResponse]):
 # ---------------------------------------------------------------------------
 
 
-class ExpressionOperatorType(str, Enum):
+class ExpressionOperatorType(WireEnum):
     """Boolean operator joining the children of an expression-tree node."""
 
     AND = "and"
@@ -299,7 +298,7 @@ class ExpressionOperatorType(str, Enum):
     OR_NOT = "or_not"
 
 
-class RuleItemDetectionTechnique(str, Enum):
+class RuleItemDetectionTechnique(WireEnum):
     """Detection technique on a rule item.
 
     Shares its vocabulary with :class:`DataPatternTechnique` and
@@ -322,14 +321,14 @@ class RuleItemDetectionTechnique(str, Enum):
     DOCUMENT_CLASSIFIER = "document_classifier"
 
 
-class RuleItemMatchType(str, Enum):
+class RuleItemMatchType(WireEnum):
     """How a matched item participates in its rule."""
 
     INCLUDE = "include"
     EXCLUDE = "exclude"
 
 
-class RuleItemOccurrenceOperatorType(str, Enum):
+class RuleItemOccurrenceOperatorType(WireEnum):
     """Comparison operator applied to occurrence-count thresholds."""
 
     ANY = "any"
@@ -338,7 +337,7 @@ class RuleItemOccurrenceOperatorType(str, Enum):
     BETWEEN = "between"
 
 
-class RuleItemConfidenceLevel(str, Enum):
+class RuleItemConfidenceLevel(WireEnum):
     """Confidence level required before a rule item counts as a match."""
 
     LOW = "low"
@@ -346,14 +345,14 @@ class RuleItemConfidenceLevel(str, Enum):
     HIGH = "high"
 
 
-class RuleItemEdmMatchCriteria(str, Enum):
+class RuleItemEdmMatchCriteria(WireEnum):
     """Whether an EDM field set matches on any field or requires all of them."""
 
     ANY = "any"
     ALL = "all"
 
 
-class DataProfileType(str, Enum):
+class DataProfileType(WireEnum):
     """Profile shape: ``BASIC`` is a single expression tree, ``ADVANCED`` nests other profiles.
 
     An advanced profile reaches other profiles through ``multi_profile`` detection rules, which
@@ -364,7 +363,7 @@ class DataProfileType(str, Enum):
     ADVANCED = "advanced"
 
 
-class DataProfileStatus(str, Enum):
+class DataProfileStatus(WireEnum):
     """Lifecycle status of a data profile."""
 
     ACTIVE = "active"
@@ -372,7 +371,7 @@ class DataProfileStatus(str, Enum):
     DELETED = "deleted"
 
 
-class DataProfileSubtype(str, Enum):
+class DataProfileSubtype(WireEnum):
     """Whether the profile ships with the product or was created by the tenant."""
 
     CUSTOM = "custom"
@@ -521,14 +520,14 @@ class PageDataProfileResponse(Page[DataProfileResponse]):
 # ---------------------------------------------------------------------------
 
 
-class DictionaryType(str, Enum):
+class DictionaryType(WireEnum):
     """Whether the dictionary ships with the product or was uploaded by the tenant."""
 
     PREDEFINED = "predefined"
     CUSTOM = "custom"
 
 
-class DictionaryCategory(str, Enum):
+class DictionaryCategory(WireEnum):
     """Dictionary category.
 
     ``SOURCE_CODE`` is ``"Source Code"`` with a literal space, and the values are
@@ -547,14 +546,14 @@ class DictionaryCategory(str, Enum):
     SOURCE_CODE = "Source Code"
 
 
-class DictionaryClassification(str, Enum):
+class DictionaryClassification(WireEnum):
     """Classification tag values supported on a dictionary."""
 
     PAB = "pab"
     ENDPOINT = "endpoint"
 
 
-class DictionaryDetectionTechnique(str, Enum):
+class DictionaryDetectionTechnique(WireEnum):
     """Detection technique reported on a dictionary response.
 
     Same thirteen values as :class:`DataPatternTechnique` and
@@ -577,7 +576,7 @@ class DictionaryDetectionTechnique(str, Enum):
     DOCUMENT_CLASSIFIER = "document_classifier"
 
 
-class DictionaryDetectionSubTechnique(str, Enum):
+class DictionaryDetectionSubTechnique(WireEnum):
     """Detection sub-technique reported on a dictionary response."""
 
     DNN = "dnn"
@@ -681,7 +680,7 @@ class PageDictionaryResponse(Page[DictionaryResponse]):
 # ---------------------------------------------------------------------------
 
 
-class ExceptionRuleAction(str, Enum):
+class ExceptionRuleAction(WireEnum):
     """What an exception rule does with traffic it matches."""
 
     ALLOW = "ALLOW"
@@ -689,7 +688,7 @@ class ExceptionRuleAction(str, Enum):
     BLOCK = "BLOCK"
 
 
-class LogSeverity(str, Enum):
+class LogSeverity(WireEnum):
     """Severity stamped on the log entry a rule produces.
 
     The spec lists these values in two different orders on the exception rule and on the
@@ -703,7 +702,7 @@ class LogSeverity(str, Enum):
     CRITICAL = "CRITICAL"
 
 
-class FilteringDirection(str, Enum):
+class FilteringDirection(WireEnum):
     """Traffic direction a filtering profile applies to."""
 
     BOTH = "BOTH"
@@ -711,7 +710,7 @@ class FilteringDirection(str, Enum):
     DOWNLOAD = "DOWNLOAD"
 
 
-class ScanType(str, Enum):
+class ScanType(WireEnum):
     """Whether the configured file types are the ones scanned or the ones skipped."""
 
     INCLUDE = "include"

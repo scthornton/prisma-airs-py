@@ -15,12 +15,11 @@ values known at the time of writing.
 
 from __future__ import annotations
 
-from enum import Enum
 from typing import Any
 
 from pydantic import ConfigDict
 
-from prisma_airs.models.base import AirsModel
+from prisma_airs.models.base import AirsModel, WireEnum
 
 # ---------------------------------------------------------------------------
 # Enums
@@ -30,7 +29,7 @@ from prisma_airs.models.base import AirsModel
 # ---------------------------------------------------------------------------
 
 
-class ErrorCodes(str, Enum):
+class ErrorCodes(WireEnum):
     """Error codes reported by the Model Security scan service.
 
     Carried on the ``error_code`` fields of a scan and its per-file records. The paired
@@ -55,7 +54,7 @@ class ErrorCodes(str, Enum):
     POLICY_EVAL_ERROR = "POLICY_EVAL_ERROR"
 
 
-class EvalOutcome(str, Enum):
+class EvalOutcome(WireEnum):
     """Result of evaluating a security group's rules against a scan.
 
     ``PENDING`` is where every newly created scan starts, not a failure state.
@@ -67,7 +66,7 @@ class EvalOutcome(str, Enum):
     ERROR = "ERROR"
 
 
-class FileScanResult(str, Enum):
+class FileScanResult(WireEnum):
     """Per-file outcome the service records on :attr:`FileResponse.result`.
 
     Distinct from :class:`ModelScanStatus`, which is what the scanner itself reports on
@@ -80,14 +79,14 @@ class FileScanResult(str, Enum):
     FAILED = "FAILED"
 
 
-class FileType(str, Enum):
+class FileType(WireEnum):
     """Node kind in the scanned model's file tree."""
 
     DIRECTORY = "DIRECTORY"
     FILE = "FILE"
 
 
-class ModelScanStatus(str, Enum):
+class ModelScanStatus(WireEnum):
     """Scanner-reported status for one file in an uploaded :class:`ScanDetails`."""
 
     SCANNED = "SCANNED"
@@ -95,7 +94,7 @@ class ModelScanStatus(str, Enum):
     ERROR = "ERROR"
 
 
-class RuleEvaluationResult(str, Enum):
+class RuleEvaluationResult(WireEnum):
     """Verdict of one rule against one scan."""
 
     PASSED = "PASSED"
@@ -103,7 +102,7 @@ class RuleEvaluationResult(str, Enum):
     ERROR = "ERROR"
 
 
-class RuleState(str, Enum):
+class RuleState(WireEnum):
     """Enforcement mode of a rule instance within a security group.
 
     ``DISABLED`` skips the rule outright; the difference between ``ALLOWING`` and
@@ -115,14 +114,14 @@ class RuleState(str, Enum):
     BLOCKING = "BLOCKING"
 
 
-class ScanOrigin(str, Enum):
+class ScanOrigin(WireEnum):
     """What submitted the scan."""
 
     MODEL_SECURITY_SDK = "MODEL_SECURITY_SDK"
     HUGGING_FACE = "HUGGING_FACE"
 
 
-class SortByDateField(str, Enum):
+class SortByDateField(WireEnum):
     """Sortable date fields on list queries.
 
     The values are wire field names in lowercase, unlike the SCREAMING_CASE used by the
@@ -133,21 +132,21 @@ class SortByDateField(str, Enum):
     UPDATED_AT = "updated_at"
 
 
-class SortByFileField(str, Enum):
+class SortByFileField(WireEnum):
     """Sortable fields on the file-listing query. Lowercase wire names, as above."""
 
     PATH = "path"
     TYPE = "type"
 
 
-class SortDirection(str, Enum):
+class SortDirection(WireEnum):
     """Sort direction for list queries."""
 
     ASC = "asc"
     DESC = "desc"
 
 
-class SourceType(str, Enum):
+class SourceType(WireEnum):
     """Where a model artifact came from, and which sources a security group covers."""
 
     LOCAL = "LOCAL"
@@ -160,7 +159,7 @@ class SourceType(str, Enum):
     ALL = "ALL"
 
 
-class ThreatCategory(str, Enum):
+class ThreatCategory(WireEnum):
     """Threat codes attached to a model scan issue.
 
     The ``PAIT-*`` codes belong to the modelscan-pai scanner rather than to this SDK and
@@ -200,7 +199,7 @@ class ThreatCategory(str, Enum):
     UNAPPROVED_FORMATS = "UNAPPROVED_FORMATS"
 
 
-class ModelSecurityGroupState(str, Enum):
+class ModelSecurityGroupState(WireEnum):
     """Lifecycle state of a security group.
 
     A group is created ``PENDING`` and becomes ``ACTIVE`` once its rule instances exist,
@@ -211,7 +210,7 @@ class ModelSecurityGroupState(str, Enum):
     ACTIVE = "ACTIVE"
 
 
-class RuleType(str, Enum):
+class RuleType(WireEnum):
     """What a rule inspects.
 
     ``METADATA`` rules judge what a model claims about itself -- license, publishing
@@ -222,7 +221,7 @@ class RuleType(str, Enum):
     ARTIFACT = "ARTIFACT"
 
 
-class RuleEditableFieldType(str, Enum):
+class RuleEditableFieldType(WireEnum):
     """Widget hint for rendering an editable rule field.
 
     ``SELECT`` fields carry :attr:`RuleEditableField.dropdown_values`; ``LIST`` fields
@@ -233,7 +232,7 @@ class RuleEditableFieldType(str, Enum):
     LIST = "LIST"
 
 
-class RuleFieldValueKey(str, Enum):
+class RuleFieldValueKey(WireEnum):
     """Keys accepted inside a rule's ``field_values`` map.
 
     Which keys a given rule accepts is declared by its ``editable_fields``; this is the

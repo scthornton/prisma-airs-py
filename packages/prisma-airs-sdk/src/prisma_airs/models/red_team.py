@@ -17,12 +17,11 @@ Adapter and target schemas track mp-openapi 0.7.67 (Adapters service).
 from __future__ import annotations
 
 import re
-from enum import Enum
 from typing import Annotated, Any, Final, TypeAlias
 
 from pydantic import AfterValidator, ConfigDict, Field
 
-from prisma_airs.models.base import AirsModel
+from prisma_airs.models.base import AirsModel, WireEnum
 
 # ---------------------------------------------------------------------------
 # Shared constraints
@@ -65,7 +64,7 @@ UuidStr: TypeAlias = Annotated[str, AfterValidator(_require_uuid)]
 # ---------------------------------------------------------------------------
 
 
-class ApiEndpointType(str, Enum):
+class ApiEndpointType(WireEnum):
     """How a target's endpoint is reachable, which decides whether a broker is needed."""
 
     PUBLIC = "PUBLIC"
@@ -73,7 +72,7 @@ class ApiEndpointType(str, Enum):
     NETWORK_BROKER = "NETWORK_BROKER"
 
 
-class AttackStatus(str, Enum):
+class AttackStatus(WireEnum):
     """Attack lifecycle status."""
 
     INIT = "INIT"
@@ -84,21 +83,21 @@ class AttackStatus(str, Enum):
     FAILED = "FAILED"
 
 
-class AttackType(str, Enum):
+class AttackType(WireEnum):
     """Attack type classification."""
 
     NORMAL = "NORMAL"
     CUSTOM = "CUSTOM"
 
 
-class AuthType(str, Enum):
+class AuthType(WireEnum):
     """Databricks authentication mode. Distinct from :class:`TargetAuthType`."""
 
     OAUTH = "OAUTH"
     ACCESS_TOKEN = "ACCESS_TOKEN"  # noqa: S105 - the name of a mode, not a credential
 
 
-class TargetAuthType(str, Enum):
+class TargetAuthType(WireEnum):
     """Authentication scheme used when calling a target. Distinct from :class:`AuthType`."""
 
     HEADERS = "HEADERS"
@@ -106,14 +105,14 @@ class TargetAuthType(str, Enum):
     OAUTH2 = "OAUTH2"
 
 
-class BasicAuthLocation(str, Enum):
+class BasicAuthLocation(WireEnum):
     """Where basic-auth credentials are placed on the outbound request."""
 
     HEADER = "HEADER"
     PAYLOAD = "PAYLOAD"
 
 
-class BrandSubCategory(str, Enum):
+class BrandSubCategory(WireEnum):
     """Brand risk subcategories."""
 
     COMPETITOR_ENDORSEMENTS = "COMPETITOR_ENDORSEMENTS"
@@ -122,7 +121,7 @@ class BrandSubCategory(str, Enum):
     POLITICAL_ENDORSEMENTS = "POLITICAL_ENDORSEMENTS"
 
 
-class ChannelStatus(str, Enum):
+class ChannelStatus(WireEnum):
     """Network broker channel lifecycle status.
 
     :attr:`Channel.status` is intentionally *not* typed as this enum -- see that class.
@@ -133,7 +132,7 @@ class ChannelStatus(str, Enum):
     DRAFT = "DRAFT"
 
 
-class ComplianceSubCategory(str, Enum):
+class ComplianceSubCategory(WireEnum):
     """Compliance frameworks a report can be mapped against."""
 
     OWASP = "OWASP"
@@ -142,7 +141,7 @@ class ComplianceSubCategory(str, Enum):
     DASF_V2 = "DASF_V2"
 
 
-class CountedQuotaEnum(str, Enum):
+class CountedQuotaEnum(WireEnum):
     """Whether a scan has been charged against the tenant's quota.
 
     ``HELD`` is a reservation, not a charge: an aborted job releases it.
@@ -153,7 +152,7 @@ class CountedQuotaEnum(str, Enum):
     NOT_COUNTED = "NOT_COUNTED"
 
 
-class DateRangeFilter(str, Enum):
+class DateRangeFilter(WireEnum):
     """Date range filter for dashboard queries."""
 
     LAST_7_DAYS = "LAST_7_DAYS"
@@ -162,7 +161,7 @@ class DateRangeFilter(str, Enum):
     ALL = "ALL"
 
 
-class ErrorSource(str, Enum):
+class ErrorSource(WireEnum):
     """Which subsystem produced an error log entry."""
 
     TARGET = "TARGET"
@@ -172,7 +171,7 @@ class ErrorSource(str, Enum):
     TARGET_PROFILING = "TARGET_PROFILING"
 
 
-class RedTeamErrorType(str, Enum):
+class RedTeamErrorType(WireEnum):
     """Red Team error classification.
 
     Prefixed ``RedTeam`` to avoid colliding with the SDK's own error taxonomy.
@@ -187,7 +186,7 @@ class RedTeamErrorType(str, Enum):
     UNKNOWN = "UNKNOWN"
 
 
-class FileFormat(str, Enum):
+class FileFormat(WireEnum):
     """Report download file format."""
 
     CSV = "CSV"
@@ -195,7 +194,7 @@ class FileFormat(str, Enum):
     ALL = "ALL"
 
 
-class GoalType(str, Enum):
+class GoalType(WireEnum):
     """Dynamic scan goal type."""
 
     BASE = "BASE"
@@ -203,21 +202,21 @@ class GoalType(str, Enum):
     GOAL_MANIPULATION = "GOAL_MANIPULATION"
 
 
-class GoalTypeQueryParam(str, Enum):
+class GoalTypeQueryParam(WireEnum):
     """Goal filter accepted on list endpoints. Not the same set as :class:`GoalType`."""
 
     AGENT = "AGENT"
     HUMAN_AUGMENTED = "HUMAN_AUGMENTED"
 
 
-class GuardrailAction(str, Enum):
+class GuardrailAction(WireEnum):
     """Guardrail action for a recommended runtime security policy."""
 
     ALLOW = "ALLOW"
     BLOCK = "BLOCK"
 
 
-class JobStatus(str, Enum):
+class JobStatus(WireEnum):
     """Red team scan job status."""
 
     INIT = "INIT"
@@ -229,7 +228,7 @@ class JobStatus(str, Enum):
     ABORTED = "ABORTED"
 
 
-class JobStatusFilter(str, Enum):
+class JobStatusFilter(WireEnum):
     """Job statuses accepted as a list filter.
 
     ``INIT`` is deliberately absent: the service rejects it as a filter value even though
@@ -244,7 +243,7 @@ class JobStatusFilter(str, Enum):
     ABORTED = "ABORTED"
 
 
-class JobType(str, Enum):
+class JobType(WireEnum):
     """Red team scan job type. Decides which job-metadata shape the service expects."""
 
     STATIC = "STATIC"
@@ -252,7 +251,7 @@ class JobType(str, Enum):
     CUSTOM = "CUSTOM"
 
 
-class PolicyType(str, Enum):
+class PolicyType(WireEnum):
     """Runtime security policy recommended by a static report."""
 
     PROMPT_INJECTION = "PROMPT_INJECTION"
@@ -263,7 +262,7 @@ class PolicyType(str, Enum):
     SENSITIVE_DATA_PROTECTION = "SENSITIVE_DATA_PROTECTION"
 
 
-class ProfilingStatus(str, Enum):
+class ProfilingStatus(WireEnum):
     """Progress of the AI-assisted target profiling pass."""
 
     INIT = "INIT"
@@ -273,7 +272,7 @@ class ProfilingStatus(str, Enum):
     FAILED = "FAILED"
 
 
-class RedTeamCategory(str, Enum):
+class RedTeamCategory(WireEnum):
     """Top-level risk category.
 
     Prefixed ``RedTeam`` to avoid colliding with the scan API's verdict category.
@@ -285,14 +284,14 @@ class RedTeamCategory(str, Enum):
     BRAND = "BRAND"
 
 
-class ResponseMode(str, Enum):
+class ResponseMode(WireEnum):
     """Whether the target answers in one shot or as a stream."""
 
     REST = "REST"
     STREAMING = "STREAMING"
 
 
-class RiskRating(str, Enum):
+class RiskRating(WireEnum):
     """Risk rating levels."""
 
     LOW = "LOW"
@@ -301,7 +300,7 @@ class RiskRating(str, Enum):
     CRITICAL = "CRITICAL"
 
 
-class SafetySubCategory(str, Enum):
+class SafetySubCategory(WireEnum):
     """Safety risk subcategories."""
 
     BIAS = "BIAS"
@@ -316,7 +315,7 @@ class SafetySubCategory(str, Enum):
     VIOLENT_CRIMES_WEAPONS = "VIOLENT_CRIMES_WEAPONS"
 
 
-class SecuritySubCategory(str, Enum):
+class SecuritySubCategory(WireEnum):
     """Security risk subcategories."""
 
     ADVERSARIAL_SUFFIX = "ADVERSARIAL_SUFFIX"
@@ -331,7 +330,7 @@ class SecuritySubCategory(str, Enum):
     MALWARE_GENERATION = "MALWARE_GENERATION"
 
 
-class SeverityFilter(str, Enum):
+class SeverityFilter(WireEnum):
     """Severity filter levels."""
 
     LOW = "LOW"
@@ -340,7 +339,7 @@ class SeverityFilter(str, Enum):
     CRITICAL = "CRITICAL"
 
 
-class StatusQueryParam(str, Enum):
+class StatusQueryParam(WireEnum):
     """Attack outcome filter.
 
     ``SUCCESSFUL`` means the *attack* succeeded, i.e. the target was breached.
@@ -350,14 +349,14 @@ class StatusQueryParam(str, Enum):
     FAILED = "FAILED"
 
 
-class StreamType(str, Enum):
+class StreamType(WireEnum):
     """Dynamic scan stream type."""
 
     NORMAL = "NORMAL"
     ADVERSARIAL = "ADVERSARIAL"
 
 
-class TargetConnectionType(str, Enum):
+class TargetConnectionType(WireEnum):
     """Target connection provider type."""
 
     DATABRICKS = "DATABRICKS"
@@ -370,7 +369,7 @@ class TargetConnectionType(str, Enum):
     WEBSOCKET = "WEBSOCKET"
 
 
-class TargetStatus(str, Enum):
+class TargetStatus(WireEnum):
     """Target lifecycle status."""
 
     DRAFT = "DRAFT"
@@ -382,7 +381,7 @@ class TargetStatus(str, Enum):
     PENDING_AUTH = "PENDING_AUTH"
 
 
-class TargetType(str, Enum):
+class TargetType(WireEnum):
     """Target classification type."""
 
     APPLICATION = "APPLICATION"
@@ -390,7 +389,7 @@ class TargetType(str, Enum):
     MODEL = "MODEL"
 
 
-class AdapterVarType(str, Enum):
+class AdapterVarType(WireEnum):
     """Whether an adapter variable is a plain value or a stored secret.
 
     ``SECRET`` values are write-only: they are never returned by the API.
