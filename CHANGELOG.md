@@ -7,8 +7,22 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed
+
+- Request bodies now render numbers the way `JSON.stringify` does. Python wrote `30.0`
+  where JavaScript writes `30`, `-0.0` for `0`, and the invalid literals `NaN` and
+  `Infinity`. Since the scan service authenticates a request with an HMAC over the body
+  bytes, an integral float anywhere in a payload produced a signature the service rejected
+  as though the API key were wrong.
+
 ### Added
 
+- Full CLI: `runtime` (scan, bulk-scan, resume-poll, results, reports, profiles, topics,
+  api-keys, customer-apps, deployment-profiles, scan-logs, dlp), `redteam`,
+  `model-security`, `aigateway`, `config`, `doctor`, `completion`, `backup`, `restore`.
+- Differential parity testing: both CLIs run against one recording server and their
+  requests, exit codes, and command trees are compared.
+- Documentation site built with MkDocs, gated by `mkdocs build --strict` in CI.
 - Service clients for every plane: `ManagementClient`, `AIGatewayClient`,
   `AIGatewayAdminClient`, `RedTeamClient`, `ModelSecurityClient`, and `DlpClient`, all
   exported from `prisma_airs`. Each shares one OAuth token cache and one connection pool

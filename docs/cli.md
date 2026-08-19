@@ -69,15 +69,38 @@ $ export PANW_AI_SEC_DEBUG=1     # log requests and responses; secrets are diges
 
 ## Command groups
 
-| Group | Covers |
+| Command | Covers |
 | --- | --- |
-| `airs runtime` | scanning, bulk scanning, profiles, topics, API keys, customer apps, scan logs |
-| `airs redteam` | red team scans, reports, targets, adapters, custom attacks |
-| `airs aigateway` | workspaces, configs, guardrails, telemetry |
-| `airs modelsecurity` | model and model-version scanning, security groups and rules |
-| `airs dlp` | data patterns, profiles, filtering profiles, dictionaries |
+| `airs runtime` | scanning and everything on the management plane (below) |
+| `airs redteam` | scans, reports, targets, adapters, custom attacks, instances, EULA, broker channels |
+| `airs model-security` | model and version scanning, security groups, rules, rule instances |
+| `airs aigateway` | workspaces, configs, guardrails, providers, API keys, telemetry |
 | `airs config` | stored settings |
 | `airs doctor` | credential and connectivity checks |
+| `airs completion` | shell completion for bash, zsh, and fish |
 
-Run `airs <group> --help` for the full surface of any group; the help text is generated
-from the same docstrings as the [API reference](reference.md).
+`runtime` carries the largest surface:
+
+| Subcommand | Covers |
+| --- | --- |
+| `scan` | scan one prompt, with the prompt as a positional argument |
+| `bulk-scan` | scan a file of prompts, resumable |
+| `resume-poll` | finish an interrupted bulk scan without re-submitting |
+| `results`, `reports` | retrieve verdicts and threat reports for asynchronous scans |
+| `profiles` | `list`, `get`, `create`, `update`, `delete`, `cleanup` |
+| `topics` | `list`, `get`, `create`, `update`, `delete`, `apply`, `eval`, `revert`, `sample` |
+| `api-keys` | `list`, `create`, `regenerate`, `delete` |
+| `customer-apps` | `list`, `get`, `update`, `delete`, `consumption` |
+| `deployment-profiles` | `list` |
+| `scan-logs` | `query` |
+| `dlp` | data patterns, profiles, filtering profiles, dictionaries, generation |
+
+Run `airs <command> --help` for the full surface of any group; the help text comes from the
+same docstrings as the [API reference](reference.md).
+
+!!! note "Two additions beyond the reference"
+
+    `runtime results` and `runtime reports` expose retrieval endpoints the SDK supports but
+    the reference has no command for. `backup` and `restore` are built from reference source
+    that its own entry point never registers. Everything else matches the reference's command
+    tree exactly, and a [parity test](parity.md) fails if an undocumented command appears.
