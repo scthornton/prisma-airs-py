@@ -9,12 +9,13 @@ from __future__ import annotations
 
 import csv
 import io
-import json
 from dataclasses import dataclass
 from enum import Enum
 from typing import Any
 
 import yaml
+
+from prisma_airs.serialization import dumps_indented, to_javascript_numbers
 
 
 class OutputFormat(str, Enum):
@@ -69,8 +70,9 @@ def format_output(
         return ""
 
     if fmt is OutputFormat.JSON:
-        # Keys, not labels: JSON output is consumed by machines.
-        return json.dumps([{c.key: row.get(c.key) for c in columns} for row in rows], indent=2)
+        # Keys, not labels: JSON output is consumed by machines. Numbers render the way the
+        # reference renders them, so a script parsing either client sees one document.
+        return dumps_indented([{c.key: row.get(c.key) for c in columns} for row in rows])
 
     if fmt is OutputFormat.CSV:
         buffer = io.StringIO()
@@ -80,7 +82,9 @@ def format_output(
         return buffer.getvalue().rstrip("\n")
 
     if fmt is OutputFormat.YAML:
-        documents = [{c.key: row.get(c.key) for c in columns} for row in rows]
+        documents = [
+            to_javascript_numbers({c.key: row.get(c.key) for c in columns}) for row in rows
+        ]
         dumped: str = yaml.safe_dump_all(documents, sort_keys=False, default_flow_style=False)
         return dumped.rstrip("\n")
 

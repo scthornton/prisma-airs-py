@@ -20,6 +20,7 @@ from prisma_airs._http.retry import execute_with_retry
 from prisma_airs._http.types import AuthAdapter, HttpMethod, PreparedRequest
 from prisma_airs.constants import MAX_NUMBER_OF_RETRIES, USER_AGENT
 from prisma_airs.errors import AISecResponseValidationError
+from prisma_airs.serialization import dumps_compact
 
 T = TypeVar("T")
 
@@ -28,16 +29,14 @@ _BASE_HEADERS: Mapping[str, str] = {"User-Agent": USER_AGENT, "service-name": "a
 
 
 def serialize_body(value: Any) -> str:
-    r"""Serialise a request body the way ``JSON.stringify`` would.
+    """Serialise a request body the way ``JSON.stringify`` would.
 
-    This is not cosmetic. The scan service authenticates requests with an HMAC computed
-    over the body bytes, so the serialisation must match the reference implementation
-    exactly: no whitespace between tokens, and non-ASCII emitted as UTF-8 rather than
-    ``\\uXXXX`` escapes. Python's defaults differ on both counts.
+    Delegates to :func:`prisma_airs.serialization.dumps_compact`, which the CLI's
+    machine-readable output also uses, so the two cannot drift apart.
     """
     if isinstance(value, BaseModel):
         value = value.model_dump(mode="json", by_alias=True, exclude_none=True)
-    return json.dumps(value, separators=(",", ":"), ensure_ascii=False)
+    return dumps_compact(value)
 
 
 @dataclass
