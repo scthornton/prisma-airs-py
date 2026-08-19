@@ -6,13 +6,13 @@ One client per plane, each exported from the package root:
 
 ```python
 from prisma_airs import (
-    Scanner,               # runtime scanning
-    ManagementClient,      # profiles, topics, API keys, DLP profiles, logs
-    AIGatewayClient,       # workspaces, configs, guardrails, telemetry
+    Scanner,  # runtime scanning
+    ManagementClient,  # profiles, topics, API keys, DLP profiles, logs
+    AIGatewayClient,  # workspaces, configs, guardrails, telemetry
     AIGatewayAdminClient,  # admin plane on its own
-    RedTeamClient,         # scans, reports, targets, custom attacks
-    ModelSecurityClient,   # supply-chain model scanning
-    DlpClient,             # DLP patterns, profiles, dictionaries
+    RedTeamClient,  # scans, reports, targets, custom attacks
+    ModelSecurityClient,  # supply-chain model scanning
+    DlpClient,  # DLP patterns, profiles, dictionaries
 )
 ```
 
@@ -55,12 +55,12 @@ Everything derives from `AISecSDKException`, and each subclass fixes a classific
 
 ```python
 from prisma_airs import (
-    AISecSDKException,             # catch-all
-    AISecClientError,              # 4xx, or the request never arrived
-    AISecServerError,              # 5xx that outlived the retry budget
-    AISecPayloadError,             # your arguments were rejected before sending
-    AISecMissingVariableError,     # a credential could not be resolved
-    AISecOAuthError,               # token acquisition failed
+    AISecSDKException,  # catch-all
+    AISecClientError,  # 4xx, or the request never arrived
+    AISecServerError,  # 5xx that outlived the retry budget
+    AISecPayloadError,  # your arguments were rejected before sending
+    AISecMissingVariableError,  # a credential could not be resolved
+    AISecOAuthError,  # token acquisition failed
     AISecResponseValidationError,  # a 2xx body did not match the model
 )
 ```
@@ -71,9 +71,9 @@ Transport failures carry the details you need to react:
 try:
     scanner.scan(prompt=text, profile_name="prod")
 except AISecClientError as err:
-    err.status_code          # 429
+    err.status_code  # 429
     err.retry_after_seconds  # 30.0, when the service said so
-    err.raw_message          # the message without the machine-readable prefix
+    err.raw_message  # the message without the machine-readable prefix
 ```
 
 ## Retries
@@ -90,7 +90,7 @@ Retries are automatic and deliberately narrow:
 Override per client or per call:
 
 ```python
-Scanner(num_retries=0)                       # exactly one attempt
+Scanner(num_retries=0)  # exactly one attempt
 scanner.scan(prompt=..., profile_name=..., num_retries=2)
 ```
 
