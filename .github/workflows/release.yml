@@ -1,0 +1,119 @@
+name: Release
+
+# Publishing is gated on a tag, and the tag is only worth cutting if the full suite passed
+# first -- so this rebuilds and re-verifies rather than trusting that CI ran on the commit.
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Build and check, but do not publish"
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: Verify before publishing
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv sync --group docs
+
+      - run: uv run ruff check .
+      - run: uv run ruff format --check .
+      - run: uv run mypy .
+      - run: uv run pytest -m "not live and not parity"
+      - run: uv run --group docs mkdocs build --strict
+
+  build:
+    name: Build distributions
+    needs: verify
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+
+      - name: Build both packages
+        run: |
+          uv build --package prisma-airs-sdk --out-dir dist
+          uv build --package prisma-airs-cli --out-dir dist
+
+      # A malformed long_description is rejected at upload time, which is a poor moment to
+      # find out. This checks the metadata before anything is published.
+      - name: Check distribution metadata
+        run: uvx twine check --strict dist/*
+
+      # A tag that disagrees with the packaged version publishes something nobody asked
+      # for, and the mistake is only visible after it is public and immutable.
+      - name: Confirm the tag matches the packaged version
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          for name in prisma_airs_sdk prisma_airs_cli; do
+            built=$(ls dist/${name}-*.whl | sed -E "s|.*/${name}-([^-]+)-.*|\\1|")
+            echo "  ${name}: tag=${tag} built=${built}"
+            if [ "$tag" != "$built" ]; then
+              echo "::error::tag v${tag} does not match ${name} version ${built}"
+              exit 1
+            fi
+          done
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: distributions
+          path: dist/
+          retention-days: 14
+
+  publish-sdk:
+    name: Publish prisma-airs-sdk
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v') && !inputs.dry_run
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      id-token: write  # PyPI trusted publishing; no long-lived token to leak
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: distributions
+          path: dist
+
+      - name: Keep only the SDK distributions
+        run: rm -f dist/prisma_airs_cli-*
+
+      - uses: pypa/gh-action-pypi-publish@release/v1
+
+  publish-cli:
+    name: Publish prisma-airs-cli
+    # Sequential, not parallel: the CLI depends on the SDK, so publishing it first would
+    # leave a window where `pip install prisma-airs-cli` cannot resolve.
+    needs: publish-sdk
+    if: startsWith(github.ref, 'refs/tags/v') && !inputs.dry_run
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: distributions
+          path: dist
+
+      - name: Keep only the CLI distributions
+        run: rm -f dist/prisma_airs_sdk-*
+
+      - uses: pypa/gh-action-pypi-publish@release/v1
