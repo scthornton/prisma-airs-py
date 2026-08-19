@@ -74,9 +74,10 @@ The exit code is the useful part in a pipeline:
 | `1` | The verdict was something else — the command worked, the content did not |
 | `2` | The command could not complete: bad arguments, missing config, or an API failure |
 
-That third code is a deliberate departure from the TypeScript client, which returns `1`
-for both a block and a failure. An expired API key must not look like a clean policy pass,
-or a broken pipeline reads as a passing one. See [Parity](parity.md).
+Codes `1` and `2` are both deliberate departures from the TypeScript client, which exits
+`0` on a blocked verdict and `1` on a failure. Here a block fails the pipeline and an
+operational failure is distinguishable from it, so an expired API key cannot read as a
+clean policy pass. See [Parity](parity.md).
 
 ## Use it as a library
 

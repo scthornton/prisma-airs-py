@@ -29,7 +29,6 @@ ARGUMENT_SETS = [
     pytest.param(
         ["runtime", "scan", "--profile", "prod", 'quote " and \\ backslash'], id="escapes"
     ),
-    pytest.param(["runtime", "scan", "--profile", "prod", ""], id="empty-prompt"),
 ]
 
 
@@ -68,8 +67,36 @@ class TestScanRequestParity:
         assert ported["headers"] == reference["headers"]
 
 
+class TestSharedRejections:
+    """Input the reference refuses, which this port must refuse identically."""
+
+    def test_both_refuse_an_empty_prompt_without_sending_anything(
+        self, recorder: Any, run_reference: Any, run_port: Any
+    ) -> None:
+        """Neither client treats "" as content.
+
+        This port briefly did, on the assumption that an empty string is
+        supplied-rather-than-absent and the service would scan it. The reference rejects it
+        with the same "at least one of..." error and sends no request at all. This test
+        exists because that assumption reached the code with a confident comment attached,
+        and only a differential run disproved it.
+        """
+        args = ["runtime", "scan", "--profile", "prod", ""]
+
+        recorder.reset()
+        reference = run_reference(args)
+        assert recorder.requests == [], "reference unexpectedly sent a request"
+
+        recorder.reset()
+        ported = run_port(args)
+        assert recorder.requests == [], "port unexpectedly sent a request"
+
+        assert reference.returncode != 0
+        assert ported.returncode != 0
+
+
 class TestExitCodes:
-    """The one place this port knowingly differs, pinned so it cannot drift further."""
+    """Where this port knowingly differs, pinned so the difference cannot drift."""
 
     def test_both_exit_zero_on_allow(
         self, recorder: Any, allow_response: dict[str, Any], run_reference: Any, run_port: Any
@@ -80,15 +107,21 @@ class TestExitCodes:
         assert run_reference(args).returncode == 0
         assert run_port(args).returncode == 0
 
-    def test_both_fail_the_build_on_a_block(
+    def test_only_this_port_fails_the_build_on_a_block(
         self, recorder: Any, allow_response: dict[str, Any], run_reference: Any, run_port: Any
     ) -> None:
-        """Both exit non-zero. Only the specific code differs, by documented design."""
+        """A deliberate divergence, and a larger one than first documented.
+
+        The reference exits 0 on a blocked verdict: it renders the result and reports
+        success. This port exits 1, so a blocked prompt fails a pipeline rather than
+        passing it silently. An earlier draft of the docs claimed both clients exit
+        non-zero and only the code differed; running the reference disproved that.
+        """
         recorder.response = {**allow_response, "action": "block", "category": "malicious"}
         args = ["runtime", "scan", "--profile", "prod", "bad"]
 
-        assert run_reference(args).returncode != 0
-        assert run_port(args).returncode != 0
+        assert run_reference(args).returncode == 0
+        assert run_port(args).returncode == 1
 
         recorder.response = allow_response
 

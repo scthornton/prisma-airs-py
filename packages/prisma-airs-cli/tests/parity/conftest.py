@@ -47,6 +47,10 @@ IGNORED_HEADERS = frozenset(
         "accept",
         "accept-encoding",
         "content-length",  # derived from the body, which is compared directly
+        # Added automatically by Node's fetch (undici), not set by the reference client.
+        # Comparing them would measure the HTTP stack rather than the port.
+        "accept-language",
+        "sec-fetch-mode",
     }
 )
 
