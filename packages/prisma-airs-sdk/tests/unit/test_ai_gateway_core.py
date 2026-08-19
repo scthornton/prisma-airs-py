@@ -574,15 +574,20 @@ class TestWorkspacesCreate:
             "users": ["user-1"],
         }
 
-    def test_a_limit_model_widens_its_numbers_but_a_mapping_does_not(
+    def test_a_limit_renders_the_same_whether_given_as_a_model_or_a_mapping(
         self, gateway: AIGatewayClient, api: respx.MockRouter
     ) -> None:
-        """The limit models declare float fields, so an int given to one leaves as a float.
+        """Both forms put ``100`` on the wire, as the reference does.
 
-        Asserted against the raw bytes because ``100 == 100.0`` in Python, which would let
-        a decoded-body assertion pass while the wire carried something else. The reference
-        implementation types these as open records and sends whatever it is handed, so a
-        caller who needs the integer form passes a mapping.
+        This test previously asserted the opposite, because the limit models declare float
+        fields and Python renders ``100.0`` where JavaScript renders ``100`` -- so passing a
+        model widened the number and passing a mapping did not. That was a serialisation
+        defect, not a property of the API, and callers were being told to pass a mapping to
+        work around it. Body serialisation now matches JavaScript's number rendering, so the
+        two agree.
+
+        Asserted against the raw bytes because ``100 == 100.0`` in Python, which would let a
+        decoded-body assertion pass while the wire carried something else.
         """
         route = api.post(f"{ADMIN}/workspaces").mock(
             return_value=httpx.Response(200, json=WORKSPACE_CREATED)
@@ -601,7 +606,8 @@ class TestWorkspacesCreate:
         )
         via_mapping = route.calls.last.request.content.decode()
 
-        assert '"value":100.0' in via_model
+        assert '"value":100' in via_model
+        assert '"value":100.0' not in via_model
         assert '"value":100' in via_mapping
         assert '"value":100.0' not in via_mapping
 

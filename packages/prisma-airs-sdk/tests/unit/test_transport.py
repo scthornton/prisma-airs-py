@@ -110,6 +110,17 @@ class TestSerializationParityWithNode:
             {"empty": {}, "list": []},
             {"escaped": 'quote " backslash \\ newline \n'},
             [1, "two", {"three": 3}],
+            # Floats were absent from this list until an integral one reached a request
+            # body and rendered as 30.0 where the reference sends 30. The omission is why
+            # that survived; these cases exist so it cannot again.
+            {"whole": 30.0},
+            {"negative_zero": -0.0},
+            {"fractional": 2.5, "whole": 7.0},
+            {"nested": {"deep": 100.0}, "in_list": [1.0, 2.5, -3.0]},
+            {"large_exact": 9007199254740991.0},
+            {"exponential": 1e21},
+            {"tenth": 0.1},
+            {"bool_is_not_a_number": True, "alongside": 1.0},
         ],
     )
     def test_matches_json_stringify(self, value: Any) -> None:
