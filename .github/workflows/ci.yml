@@ -84,3 +84,22 @@ jobs:
           name: distributions
           path: dist/
           retention-days: 7
+
+  docs:
+    name: Build documentation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv sync --group docs
+
+      # --strict turns a broken cross-reference or an orphaned page into a failure,
+      # which is the only way documentation rot gets noticed.
+      - name: Build docs
+        run: uv run --group docs mkdocs build --strict
