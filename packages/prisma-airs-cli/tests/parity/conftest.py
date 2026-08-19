@@ -218,6 +218,11 @@ def _env(recorder: Recorder, home: Path) -> dict[str, str]:
         "PANW_AI_SEC_API_ENDPOINT": recorder.base_url,
         "PRISMA_AIRS_CONFIG": str(home / "absent.json"),
         "NO_COLOR": "1",
+        # Wide enough that neither client wraps its help text. A wrapped description
+        # continues on a line that looks structurally like a command row, which any parser
+        # reading --help will happily mistake for a command.
+        "COLUMNS": "200",
+        "TERM": "dumb",
     }
 
 
