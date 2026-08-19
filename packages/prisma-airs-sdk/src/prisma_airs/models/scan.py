@@ -99,6 +99,9 @@ class Content(AirsModel):
     At least one of ``prompt``, ``response``, ``code_prompt``, ``code_response``, or
     ``tool_event`` must be present -- ``context`` alone gives the service nothing to
     evaluate.
+
+    "Present" means truthy, so an empty string does not count. That matches the reference
+    client, which refuses an empty prompt with this same error rather than sending one.
     """
 
     prompt: str | None = None
@@ -135,6 +138,9 @@ class Content(AirsModel):
 
     @model_validator(mode="after")
     def _require_scannable_content(self) -> Content:
+        # Falsiness, not `is None`: an empty string counts as nothing to scan. Verified
+        # against the reference, which rejects `scan --profile p ""` with this same
+        # message rather than sending {"prompt": ""}.
         if not any(
             (self.prompt, self.response, self.code_prompt, self.code_response, self.tool_event)
         ):
