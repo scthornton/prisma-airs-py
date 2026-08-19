@@ -1,0 +1,51 @@
+name: Parity
+
+# Differential tests against the TypeScript reference. Kept out of the default CI run
+# because they need a Node toolchain and a build of the reference source, which makes them
+# slower and dependent on an external repository staying buildable.
+on:
+  schedule:
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "packages/prisma-airs-cli/tests/parity/**"
+      - "packages/prisma-airs-sdk/src/prisma_airs/_http/**"
+      - "packages/prisma-airs-cli/src/prisma_airs_cli/commands/**"
+
+permissions:
+  contents: read
+
+jobs:
+  differential:
+    name: Differential vs the TypeScript reference
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      # The published npm package exposes an older command surface than the repository
+      # source at the same version, so the reference has to be built from source.
+      - name: Build the reference CLI
+        run: |
+          git clone --depth 1 https://github.com/cdot65/prisma-airs-cli.git "$RUNNER_TEMP/reference"
+          cd "$RUNNER_TEMP/reference"
+          npm install --no-audit --no-fund
+          npm run build
+          echo "AIRS_REFERENCE_CLI=$RUNNER_TEMP/reference/dist/cli/index.js" >> "$GITHUB_ENV"
+
+      - name: Install dependencies
+        run: uv sync
+
+      - name: Run differential parity tests
+        env:
+          AIRS_PARITY: "1"
+        run: uv run pytest -m parity -v
