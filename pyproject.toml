@@ -118,6 +118,11 @@ strict = true
 # Without this, mypy synthesises model __init__ from aliases alone and rejects
 # construction by field name, even where populate_by_name allows it at runtime.
 plugins = ["pydantic.mypy"]
+# Each package's tests carry their own conftest, which mypy would otherwise map to a single
+# top-level module named "conftest" and refuse as a duplicate. Resolving module names from
+# the declared bases keeps them distinct without excluding fixtures from type checking.
+explicit_package_bases = true
+mypy_path = "packages/prisma-airs-sdk/src:packages/prisma-airs-cli/src:packages/prisma-airs-cli:packages/prisma-airs-sdk"
 warn_unreachable = true
 warn_no_return = true
 disallow_any_generics = true
