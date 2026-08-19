@@ -1,0 +1,66 @@
+site_name: prisma-airs-py
+site_description: Python SDK and CLI for Palo Alto Networks Prisma AIRS
+repo_url: https://github.com/scthornton/prisma-airs-py
+repo_name: scthornton/prisma-airs-py
+edit_uri: edit/main/docs/
+
+theme:
+  name: material
+  features:
+    - navigation.sections
+    - navigation.top
+    - content.code.copy
+    - content.code.annotate
+    - search.suggest
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: teal
+      toggle:
+        icon: material/weather-night
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: teal
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to light mode
+
+nav:
+  - Home: index.md
+  - Getting started: getting-started.md
+  - Credentials: credentials.md
+  - CLI: cli.md
+  - Using the SDK: sdk.md
+  - Testing with Prisma AIRS: testing.md
+  - Parity with the TypeScript client: parity.md
+  - API reference: reference.md
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+  - toc:
+      permalink: true
+
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          paths: [packages/prisma-airs-sdk/src, packages/prisma-airs-cli/src]
+          options:
+            docstring_style: google
+            show_source: false
+            show_root_heading: true
+            members_order: source
+            separate_signature: true
+            show_signature_annotations: true
+            filters: ["!^_"]
+
+watch:
+  - packages/prisma-airs-sdk/src
+  - packages/prisma-airs-cli/src
