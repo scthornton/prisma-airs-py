@@ -4,6 +4,8 @@ A topic is a natural-language description of something a profile should block or
 The workflow these commands cover is a loop: `create` the topic, `apply` it to a profile,
 `eval` it against a labelled prompt set, and `revert` it when it does not earn its place.
 `sample` prints the CSV shape `eval` expects, so the loop can be started from nothing.
+Around that loop sit the plain CRUD commands -- `list`, `get`, `update`, and `delete` --
+which read and edit the topic definitions themselves rather than any profile's use of them.
 """
 
 from __future__ import annotations
@@ -11,6 +13,7 @@ from __future__ import annotations
 import csv
 import io
 import json
+import re
 import sys
 import threading
 import time
@@ -23,6 +26,7 @@ from pathlib import Path
 from typing import Annotated, Any, Final
 
 import typer
+from pydantic import ValidationError
 
 from prisma_airs import ManagementClient, Scanner
 from prisma_airs.errors import AISecSDKException
@@ -41,6 +45,7 @@ from prisma_airs.models.management import (
 from prisma_airs_cli.config import load_config, resolve
 from prisma_airs_cli.confirm import confirm_or_abort
 from prisma_airs_cli.errors import fail, usage_error
+from prisma_airs_cli.output import OutputFormat
 from prisma_airs_cli.renderers.topics import (
     ApplyOutput,
     CaseResult,
@@ -52,6 +57,9 @@ from prisma_airs_cli.renderers.topics import (
     render_create,
     render_eval,
     render_revert,
+    render_runtime_config_header,
+    render_topic_detail,
+    render_topic_list,
 )
 from prisma_airs_cli.ui import ui
 
@@ -87,6 +95,12 @@ SAMPLE_CSV: Final = """prompt,expected,intent
 
 #: A prompt set this lopsided still evaluates, but its rates are close to meaningless.
 _IMBALANCE_RATIO: Final = 0.8
+
+#: Decides how `topics get` reads its argument. The API has no lookup-by-name endpoint, so
+#: the shape of the value is the only thing that can say which field to match on.
+_UUID_RE: Final = re.compile(
+    r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", re.IGNORECASE
+)
 
 #: Typer collapses single newlines in an epilog and keeps double ones, so examples are
 #: separated by blank lines to survive rendering as separate lines.
@@ -128,6 +142,19 @@ class TopicOutput(str, Enum):
 
     PRETTY = "pretty"
     JSON = "json"
+
+
+class TopicDetailOutput(str, Enum):
+    """How `topics get` renders the topic it found.
+
+    One record again, so no table or CSV -- but unlike :class:`TopicOutput` this one adds
+    YAML, because the reference registers it here and a topic's examples read better as a
+    YAML list than as a JSON array.
+    """
+
+    PRETTY = "pretty"
+    JSON = "json"
+    YAML = "yaml"
 
 
 # ---------------------------------------------------------------------------
@@ -175,6 +202,76 @@ def _find_topic(topics: Sequence[CustomTopic], name: str, missing: str) -> tuple
     if match is None:
         raise fail(RuntimeError(missing))
     return match, _require(match.topic_id, f'Topic "{name}" has no topic_id')
+
+
+def _fetch_topic(mgmt: ManagementClient, name_or_id: str) -> CustomTopic:
+    """Resolve a topic by UUID or by name.
+
+    There is no read-one endpoint, so both paths list and filter locally. Which field is
+    matched is decided by the shape of the argument: a UUID-shaped value is never a name
+    worth searching for, and a name is never a valid ID to ask about.
+
+    Raises:
+        typer.Exit: If no topic answers to the value.
+    """
+    topics = mgmt.topics.list().custom_topics
+    if _UUID_RE.match(name_or_id):
+        match = next((t for t in topics if t.topic_id == name_or_id), None)
+        if match is None:
+            raise fail(RuntimeError(f"Topic {name_or_id} not found"))
+        return match
+
+    match = next((t for t in topics if t.topic_name == name_or_id), None)
+    if match is None:
+        raise fail(RuntimeError(f'Topic "{name_or_id}" not found'))
+    return match
+
+
+def _load_topic_update(path: Path) -> CreateCustomTopicRequest:
+    """Read the JSON document `--config` names into an update body.
+
+    Validated before it is sent so a typo is reported against the file the user wrote,
+    naming the field, rather than coming back as a 400 about a body they never saw. Fields
+    the model does not declare survive validation and reach the API unchanged.
+
+    Raises:
+        typer.Exit: If the file cannot be read, is not JSON, is not a JSON object, or does
+            not satisfy the topic schema.
+    """
+    try:
+        parsed = json.loads(path.read_text())
+    except OSError as err:
+        raise usage_error(f"Cannot read {path}: {err}") from err
+    except json.JSONDecodeError as err:
+        raise usage_error(f"{path} is not valid JSON: {err}") from err
+
+    if not isinstance(parsed, dict):
+        raise usage_error(f"{path} must contain a JSON object")
+
+    try:
+        return CreateCustomTopicRequest.model_validate(parsed)
+    except ValidationError as err:
+        detail = "; ".join(
+            f"{'.'.join(str(part) for part in item['loc']) or '(body)'}: {item['msg']}"
+            for item in err.errors()
+        )
+        raise usage_error(f"{path} is not a valid topic update: {detail}") from err
+
+
+def _check_paging(limit: int, offset: int) -> None:
+    """Reject negative paging values.
+
+    Deliberately not ``resolve_page_params``: that converts an offset into a page number,
+    and this endpoint takes a row offset directly. Running the value through the page
+    arithmetic would quietly return a different slice than the caller asked for.
+
+    Raises:
+        typer.Exit: If either value is negative.
+    """
+    if limit < 0:
+        raise usage_error(f"--limit must not be negative, got {limit}")
+    if offset < 0:
+        raise usage_error(f"--offset must not be negative, got {offset}")
 
 
 def _byte_len(text: str) -> int:
@@ -620,6 +717,54 @@ def create(
         render_create(result)
 
 
+@topics_app.command("delete")
+def delete(
+    topic_id: Annotated[str, typer.Argument(help="UUID of the topic to delete.")],
+    *,
+    force: Annotated[
+        bool,
+        typer.Option(
+            "--force",
+            help="Skip confirmation and force delete (removes from all referencing profiles).",
+        ),
+    ] = False,
+    updated_by: Annotated[
+        str | None, typer.Option("--updated-by", help="Email of user performing force deletion.")
+    ] = None,
+) -> None:
+    """Delete a custom topic.
+
+    `--force` does two things at once, as it does in the reference: it skips the
+    confirmation, and it switches to the force endpoint, which detaches the topic from
+    every profile still referencing it. Without it the plain delete is used, which fails
+    rather than quietly editing a profile someone else depends on.
+    """
+    render_runtime_config_header()
+    # Asked before the client is built, so a refusal never depends on having credentials.
+    confirm_or_abort(f"Delete topic {topic_id}?", force=force, action=f"delete topic {topic_id}")
+
+    try:
+        with ManagementClient() as mgmt:
+            if force:
+                # --updated-by is recorded against the profiles the force delete edits,
+                # so it only has a meaning on this path.
+                result = mgmt.topics.force_delete(topic_id, updated_by=updated_by)
+                ui.success(result.message)
+            else:
+                mgmt.topics.delete(topic_id)
+                # The response message names the topic by ID anyway; this says what the
+                # reference says, so a script grepping either client sees one string.
+                ui.success(f"Topic {topic_id} deleted.")
+    except AISecSDKException as err:
+        raise fail(err) from err
+
+
+# `rm` is the alias the reference declares on the command itself. Typer has no alias
+# mechanism, so it is a second registration of the same callback, hidden to keep `--help`
+# listing each command once.
+topics_app.command("rm", hidden=True)(delete)
+
+
 # `eval` is a builtin, so the Python name differs; the CLI name is unchanged.
 @topics_app.command("eval", epilog=_EVAL_EPILOG)
 def eval_topic(
@@ -680,6 +825,66 @@ def eval_topic(
         render_eval(result)
 
 
+@topics_app.command("get")
+def get(
+    name_or_id: Annotated[str, typer.Argument(help="Topic name or UUID.")],
+    *,
+    output: Annotated[
+        TopicDetailOutput, typer.Option("--output", help="Output format: pretty, json, yaml.")
+    ] = TopicDetailOutput.PRETTY,
+) -> None:
+    """Get a custom topic by name or UUID.
+
+    Either identifier works because a topic is created by name and referenced by ID, so
+    whichever one is to hand is the one worth typing.
+    """
+    if output is TopicDetailOutput.PRETTY:
+        render_runtime_config_header()
+
+    try:
+        with ManagementClient() as mgmt:
+            topic = _fetch_topic(mgmt, name_or_id)
+    except AISecSDKException as err:
+        raise fail(err) from err
+
+    render_topic_detail(topic, OutputFormat(output.value))
+
+
+# `list` shadows the builtin, which this module uses for its own annotations, so the
+# function is renamed; the CLI command is still `list`.
+@topics_app.command("list")
+def list_topics(
+    *,
+    limit: Annotated[int, typer.Option("--limit", help="Max results.")] = 100,
+    offset: Annotated[int, typer.Option("--offset", help="Starting offset.")] = 0,
+    output: Annotated[
+        OutputFormat,
+        typer.Option("--output", help="Output format: pretty, table, csv, json, yaml."),
+    ] = OutputFormat.PRETTY,
+) -> None:
+    """List custom topics.
+
+    The paging flags are sent to the API rather than applied to a fetched-everything list,
+    so a tenant with more topics than one page holds can still reach the rest of them.
+    """
+    _check_paging(limit, offset)
+
+    if output is OutputFormat.PRETTY:
+        render_runtime_config_header()
+
+    try:
+        with ManagementClient() as mgmt:
+            page = mgmt.topics.list(offset=offset, limit=limit)
+    except AISecSDKException as err:
+        raise fail(err) from err
+
+    render_topic_list(page.custom_topics, output, next_offset=page.next_offset)
+
+
+# `ls`, like `rm` above: the reference's own alias, registered a second time and hidden.
+topics_app.command("ls", hidden=True)(list_topics)
+
+
 @topics_app.command("revert")
 def revert(
     *,
@@ -733,3 +938,37 @@ def sample(
 
     output_file.write_text(SAMPLE_CSV, encoding="utf-8")
     ui.success(f"Sample CSV written to {output_file}")
+
+
+@topics_app.command("update")
+def update(
+    topic_id: Annotated[str, typer.Argument(help="UUID of the topic to update.")],
+    *,
+    config: Annotated[
+        Path,
+        typer.Option(
+            "--config",
+            help="JSON file with topic updates.",
+            exists=True,
+            dir_okay=False,
+        ),
+    ],
+) -> None:
+    """Update a custom topic.
+
+    The file replaces the whole definition rather than patching it -- the API has no merge
+    semantics here -- so a file that omits `examples` removes them. Each update mints a new
+    revision, and profiles stay pinned to the revision they were saved against until they
+    are re-applied.
+    """
+    render_runtime_config_header()
+    body = _load_topic_update(config)
+
+    try:
+        with ManagementClient() as mgmt:
+            topic = mgmt.topics.update(topic_id, body)
+    except AISecSDKException as err:
+        raise fail(err) from err
+
+    ui.success(f"Topic updated: {topic.topic_id}")
+    render_topic_detail(topic)

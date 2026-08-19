@@ -12,11 +12,13 @@ import threading
 import time
 from collections.abc import Callable, Iterator
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any
 
 import httpx
 import pytest
 import respx
+import yaml
 from typer.testing import CliRunner
 
 from prisma_airs.constants import (
@@ -24,6 +26,7 @@ from prisma_airs.constants import (
     DEFAULT_MGMT_ENDPOINT,
     DEFAULT_TOKEN_ENDPOINT,
 )
+from prisma_airs_cli import confirm as confirm_module
 from prisma_airs_cli.commands.topics import topics_app
 
 runner = CliRunner()
@@ -36,6 +39,7 @@ PROFILE_ID = "7c9e6679-7425-40de-944b-e07fc1f90ae7"
 TOPIC_URL = f"{DEFAULT_MGMT_ENDPOINT}/v1/mgmt/topic"
 TOPIC_UPDATE_URL = f"{TOPIC_URL}/uuid/{TOPIC_ID}"
 TOPIC_FORCE_URL = f"{TOPIC_URL}/force/{TOPIC_ID}"
+TOPIC_DELETE_URL = f"{TOPIC_URL}/{TOPIC_ID}"
 TOPICS_TSG_URL = f"{DEFAULT_MGMT_ENDPOINT}/v1/mgmt/topics/tsg/{TSG_ID}"
 PROFILES_TSG_URL = f"{DEFAULT_MGMT_ENDPOINT}/v1/mgmt/profiles/tsg/{TSG_ID}"
 PROFILE_UPDATE_URL = f"{DEFAULT_MGMT_ENDPOINT}/v1/mgmt/profile/uuid/{PROFILE_ID}"
@@ -146,11 +150,30 @@ def buckets_of(route: respx.Route) -> Any:
     return {bucket["action"]: bucket["topic"] for bucket in guardrail_of(route)["topic-list"]}
 
 
+def url_of(route: respx.Route) -> str:
+    """The full URL, query string included, the last call to a route carried."""
+    return str(route.calls.last.request.url)
+
+
+def write_json(tmp_path: Path, payload: Any) -> str:
+    """Write a `--config` document and return its path."""
+    path = tmp_path / "topic.json"
+    path.write_text(json.dumps(payload) if not isinstance(payload, str) else payload)
+    return str(path)
+
+
 def write_csv(tmp_path: Path, text: str) -> str:
     """Write a prompt set and return its path."""
     path = tmp_path / "prompts.csv"
     path.write_text(text)
     return str(path)
+
+
+#: The banner the reference opens `list`, `get`, `update`, and `delete` with -- and which
+#: it deliberately withholds from the guardrail loop (`create`, `apply`, `eval`, `revert`,
+#: `sample`). Matched on the first line alone so the assertion does not depend on how a
+#: narrow terminal wraps the subtitle.
+RUNTIME_HEADER = "Runtime Configuration"
 
 
 # ---------------------------------------------------------------------------
@@ -204,7 +227,16 @@ class TestCreate:
             ],
         )
 
-        assert "Topic created" in result.output
+        assert result.exit_code == 0
+        # The whole pretty block, not just the verb: the reference prints the name on the
+        # success line and the ID and revision as a labelled pair beneath it, and a label
+        # that drifts is what a script scraping this output breaks on.
+        assert "Topic created: Financial Advice" in result.output
+        assert TOPIC_ID in result.output
+        assert "Revision" in result.output
+        # The API sent 3, so a script must not read 3.0 back off the pretty view either.
+        assert "3" in result.output
+        assert "3.0" not in result.output
 
     def test_updates_a_topic_whose_name_already_exists(self, api: respx.MockRouter) -> None:
         """Re-running create must revise the topic in place, not mint a duplicate."""
@@ -1491,5 +1523,719 @@ class TestEval:
                 "1",
             ],
         )
+
+        assert result.exit_code == 2
+
+
+# ---------------------------------------------------------------------------
+# list
+# ---------------------------------------------------------------------------
+
+
+class TestList:
+    def test_asks_for_the_reference_default_page(self, api: respx.MockRouter) -> None:
+        """The flag defaults are part of the contract: 100 rows from the top."""
+        route = api.get(TOPICS_TSG_URL).mock(
+            return_value=httpx.Response(200, json={"custom_topics": [TOPIC]})
+        )
+
+        result = runner.invoke(topics_app, ["list"])
+
+        assert result.exit_code == 0
+        assert url_of(route) == f"{TOPICS_TSG_URL}?offset=0&limit=100"
+
+    def test_paging_flags_reach_the_query(self, api: respx.MockRouter) -> None:
+        route = api.get(TOPICS_TSG_URL).mock(
+            return_value=httpx.Response(200, json={"custom_topics": [TOPIC]})
+        )
+
+        result = runner.invoke(topics_app, ["list", "--limit", "10", "--offset", "20"])
+
+        assert result.exit_code == 0
+        assert url_of(route) == f"{TOPICS_TSG_URL}?offset=20&limit=10"
+
+    def test_ls_is_the_same_command(self, api: respx.MockRouter) -> None:
+        """The reference registers `list|ls`; the alias must not be a different command."""
+        route = api.get(TOPICS_TSG_URL).mock(
+            return_value=httpx.Response(200, json={"custom_topics": [TOPIC]})
+        )
+
+        result = runner.invoke(topics_app, ["ls", "--limit", "10", "--offset", "20"])
+
+        assert result.exit_code == 0
+        assert url_of(route) == f"{TOPICS_TSG_URL}?offset=20&limit=10"
+
+    def test_rejects_a_negative_limit(self, api: respx.MockRouter) -> None:
+        route = api.get(TOPICS_TSG_URL).mock(
+            return_value=httpx.Response(200, json={"custom_topics": []})
+        )
+
+        result = runner.invoke(topics_app, ["list", "--limit", "-5"])
+
+        assert result.exit_code == 2
+        assert not route.called
+
+    def test_rejects_a_negative_offset(self, api: respx.MockRouter) -> None:
+        route = api.get(TOPICS_TSG_URL).mock(
+            return_value=httpx.Response(200, json={"custom_topics": []})
+        )
+
+        result = runner.invoke(topics_app, ["list", "--offset", "-1"])
+
+        assert result.exit_code == 2
+        assert not route.called
+
+    def test_an_empty_page_reads_as_success(self, api: respx.MockRouter) -> None:
+        api.get(TOPICS_TSG_URL).mock(return_value=httpx.Response(200, json={"custom_topics": []}))
+
+        result = runner.invoke(topics_app, ["list"])
+
+        assert result.exit_code == 0
+        assert "No topics found" in result.output
+
+    def test_an_empty_page_emits_no_document(self, api: respx.MockRouter) -> None:
+        """A lone `[]` would be a second empty shape for a caller to handle."""
+        api.get(TOPICS_TSG_URL).mock(return_value=httpx.Response(200, json={"custom_topics": []}))
+
+        result = runner.invoke(topics_app, ["list", "--output", "json"])
+
+        assert result.exit_code == 0
+        assert "[]" not in result.output
+
+    def test_a_pretty_entry_carries_id_revision_and_description(
+        self, api: respx.MockRouter
+    ) -> None:
+        api.get(TOPICS_TSG_URL).mock(
+            return_value=httpx.Response(200, json={"custom_topics": [TOPIC]})
+        )
+
+        result = runner.invoke(topics_app, ["list"])
+
+        assert TOPIC_ID in result.output
+        assert "Financial Advice" in result.output
+        assert "rev:3" in result.output
+        assert "Requests for personal investment advice" in result.output
+
+    def test_a_long_description_is_cut_to_a_preview(self, api: respx.MockRouter) -> None:
+        """One line per topic; `topics get` is where the whole description lives."""
+        long_topic = {**TOPIC, "description": "d" * 100}
+        api.get(TOPICS_TSG_URL).mock(
+            return_value=httpx.Response(200, json={"custom_topics": [long_topic]})
+        )
+
+        result = runner.invoke(topics_app, ["list"])
+
+        assert "d" * 80 in result.output
+        assert "d" * 81 not in result.output
+
+    def test_a_bracketed_name_is_not_read_as_markup(self, api: respx.MockRouter) -> None:
+        bracketed = {**TOPIC, "topic_name": "Legal [advice]"}
+        api.get(TOPICS_TSG_URL).mock(
+            return_value=httpx.Response(200, json={"custom_topics": [bracketed]})
+        )
+
+        result = runner.invoke(topics_app, ["list"])
+
+        assert "Legal [advice]" in result.output
+
+    def test_table_output_carries_the_reference_columns(self, api: respx.MockRouter) -> None:
+        api.get(TOPICS_TSG_URL).mock(
+            return_value=httpx.Response(200, json={"custom_topics": [TOPIC]})
+        )
+
+        result = runner.invoke(topics_app, ["list", "--output", "table"])
+
+        header = result.output.splitlines()[0]
+        assert [cell.strip() for cell in header.split("│")] == [
+            "ID",
+            "Name",
+            "Revision",
+            "Description",
+        ]
+
+    def test_csv_output_is_the_row_verbatim(self, api: respx.MockRouter) -> None:
+        api.get(TOPICS_TSG_URL).mock(
+            return_value=httpx.Response(200, json={"custom_topics": [TOPIC]})
+        )
+
+        result = runner.invoke(topics_app, ["list", "--output", "csv"])
+
+        assert result.output.splitlines() == [
+            "ID,Name,Revision,Description",
+            f"{TOPIC_ID},Financial Advice,3,Requests for personal investment advice",
+        ]
+
+    def test_json_output_uses_the_reference_row_keys(self, api: respx.MockRouter) -> None:
+        api.get(TOPICS_TSG_URL).mock(
+            return_value=httpx.Response(200, json={"custom_topics": [TOPIC]})
+        )
+
+        result = runner.invoke(topics_app, ["list", "--output", "json"])
+
+        assert json.loads(result.output) == [
+            {
+                "id": TOPIC_ID,
+                "name": "Financial Advice",
+                "revision": 3,
+                "description": "Requests for personal investment advice",
+            }
+        ]
+        # Raw text too: a script reading the revision back must not find 3.0 where the
+        # API sent 3.
+        assert '"revision": 3,' in result.output
+
+    def test_yaml_output_parses_back_to_the_row(self, api: respx.MockRouter) -> None:
+        api.get(TOPICS_TSG_URL).mock(
+            return_value=httpx.Response(200, json={"custom_topics": [TOPIC]})
+        )
+
+        result = runner.invoke(topics_app, ["list", "--output", "yaml"])
+
+        assert yaml.safe_load(result.output) == {
+            "id": TOPIC_ID,
+            "name": "Financial Advice",
+            "revision": 3,
+            "description": "Requests for personal investment advice",
+        }
+
+    def test_a_cut_short_page_names_where_to_resume(self, api: respx.MockRouter) -> None:
+        api.get(TOPICS_TSG_URL).mock(
+            return_value=httpx.Response(200, json={"custom_topics": [TOPIC], "next_offset": 100})
+        )
+
+        result = runner.invoke(topics_app, ["list"])
+
+        assert "--offset 100" in result.output
+
+    def test_a_complete_page_says_nothing_about_more(self, api: respx.MockRouter) -> None:
+        api.get(TOPICS_TSG_URL).mock(
+            return_value=httpx.Response(200, json={"custom_topics": [TOPIC]})
+        )
+
+        result = runner.invoke(topics_app, ["list"])
+
+        assert "More topics" not in result.output
+
+    def test_pretty_output_opens_with_the_runtime_header(self, api: respx.MockRouter) -> None:
+        """The reference prints the banner here; omitting it is a silent parity drift."""
+        api.get(TOPICS_TSG_URL).mock(
+            return_value=httpx.Response(200, json={"custom_topics": [TOPIC]})
+        )
+
+        result = runner.invoke(topics_app, ["list"])
+
+        assert RUNTIME_HEADER in result.output
+
+    @pytest.mark.parametrize("fmt", ["table", "csv", "json", "yaml"])
+    def test_structured_output_carries_no_header(self, api: respx.MockRouter, fmt: str) -> None:
+        """The reference guards the banner on `pretty`; a banner would corrupt a parse."""
+        api.get(TOPICS_TSG_URL).mock(
+            return_value=httpx.Response(200, json={"custom_topics": [TOPIC]})
+        )
+
+        result = runner.invoke(topics_app, ["list", "--output", fmt])
+
+        assert RUNTIME_HEADER not in result.output
+
+    def test_an_api_failure_exits_two(self, api: respx.MockRouter) -> None:
+        api.get(TOPICS_TSG_URL).mock(
+            return_value=httpx.Response(403, json={"message": "Forbidden"})
+        )
+
+        result = runner.invoke(topics_app, ["list"])
+
+        assert result.exit_code == 2
+
+
+# ---------------------------------------------------------------------------
+# get
+# ---------------------------------------------------------------------------
+
+#: A topic carrying every optional field, so the detail views have something to drop.
+DETAILED_TOPIC = {
+    **TOPIC,
+    "active": True,
+    "created_by": "author@example.com",
+    "updated_by": "editor@example.com",
+    "last_modified_ts": "2026-08-18T12:00:00Z",
+}
+
+
+class TestGet:
+    def test_finds_a_topic_by_uuid(self, api: respx.MockRouter) -> None:
+        route = api.get(TOPICS_TSG_URL).mock(
+            return_value=httpx.Response(200, json={"custom_topics": [OTHER_TOPIC, TOPIC]})
+        )
+
+        result = runner.invoke(topics_app, ["get", TOPIC_ID])
+
+        assert result.exit_code == 0
+        assert route.called
+        assert "Financial Advice" in result.output
+        assert "Legal Advice" not in result.output
+
+    def test_reads_one_default_page_of_the_listing(self, api: respx.MockRouter) -> None:
+        """There is no read-one endpoint, so `get` filters the listing -- exactly as the
+        reference does, over a single default page rather than a caller-controlled one.
+        """
+        route = api.get(TOPICS_TSG_URL).mock(
+            return_value=httpx.Response(200, json={"custom_topics": [TOPIC]})
+        )
+
+        result = runner.invoke(topics_app, ["get", TOPIC_ID])
+
+        assert result.exit_code == 0
+        assert route.calls.last.request.method == "GET"
+        assert url_of(route) == f"{TOPICS_TSG_URL}?offset=0&limit=100"
+
+    def test_finds_a_topic_by_name(self, api: respx.MockRouter) -> None:
+        api.get(TOPICS_TSG_URL).mock(
+            return_value=httpx.Response(200, json={"custom_topics": [OTHER_TOPIC, TOPIC]})
+        )
+
+        result = runner.invoke(topics_app, ["get", "Financial Advice"])
+
+        assert result.exit_code == 0
+        assert TOPIC_ID in result.output
+        assert OTHER_TOPIC_ID not in result.output
+
+    def test_a_uuid_is_never_matched_against_a_name(self, api: respx.MockRouter) -> None:
+        """A UUID-shaped argument addresses the ID column, even if a name looks like one."""
+        named_like_a_uuid = {**TOPIC, "topic_id": OTHER_TOPIC_ID, "topic_name": TOPIC_ID}
+        api.get(TOPICS_TSG_URL).mock(
+            return_value=httpx.Response(200, json={"custom_topics": [named_like_a_uuid]})
+        )
+
+        result = runner.invoke(topics_app, ["get", TOPIC_ID])
+
+        assert result.exit_code == 2
+
+    def test_an_unknown_uuid_exits_two(self, api: respx.MockRouter) -> None:
+        api.get(TOPICS_TSG_URL).mock(return_value=httpx.Response(200, json={"custom_topics": []}))
+
+        result = runner.invoke(topics_app, ["get", TOPIC_ID])
+
+        assert result.exit_code == 2
+        assert TOPIC_ID in result.output
+
+    def test_an_unknown_name_exits_two(self, api: respx.MockRouter) -> None:
+        api.get(TOPICS_TSG_URL).mock(
+            return_value=httpx.Response(200, json={"custom_topics": [TOPIC]})
+        )
+
+        result = runner.invoke(topics_app, ["get", "Nope"])
+
+        assert result.exit_code == 2
+        assert "Nope" in result.output
+
+    def test_pretty_shows_the_definition_and_the_audit_trail(self, api: respx.MockRouter) -> None:
+        api.get(TOPICS_TSG_URL).mock(
+            return_value=httpx.Response(200, json={"custom_topics": [DETAILED_TOPIC]})
+        )
+
+        result = runner.invoke(topics_app, ["get", TOPIC_ID])
+
+        assert "Topic Detail" in result.output
+        assert "Examples" in result.output
+        assert "Should I buy TSLA stock?" in result.output
+        assert "How should I invest my savings?" in result.output
+        assert "author@example.com" in result.output
+        assert "editor@example.com" in result.output
+        assert "2026-08-18T12:00:00Z" in result.output
+
+    def test_pretty_drops_a_field_the_api_did_not_send(self, api: respx.MockRouter) -> None:
+        """A screen of empty labels says less than a short list of what is actually set."""
+        api.get(TOPICS_TSG_URL).mock(
+            return_value=httpx.Response(200, json={"custom_topics": [TOPIC]})
+        )
+
+        result = runner.invoke(topics_app, ["get", TOPIC_ID])
+
+        assert "Created" not in result.output
+        assert "Modified" not in result.output
+
+    def test_a_bracketed_name_is_not_read_as_markup(self, api: respx.MockRouter) -> None:
+        bracketed = {**TOPIC, "topic_name": "Legal [advice]"}
+        api.get(TOPICS_TSG_URL).mock(
+            return_value=httpx.Response(200, json={"custom_topics": [bracketed]})
+        )
+
+        result = runner.invoke(topics_app, ["get", "Legal [advice]"])
+
+        assert result.exit_code == 0
+        assert "Legal [advice]" in result.output
+
+    def test_json_output_is_the_record_the_api_sent(self, api: respx.MockRouter) -> None:
+        api.get(TOPICS_TSG_URL).mock(
+            return_value=httpx.Response(200, json={"custom_topics": [DETAILED_TOPIC]})
+        )
+
+        result = runner.invoke(topics_app, ["get", TOPIC_ID, "--output", "json"])
+
+        assert json.loads(result.output) == DETAILED_TOPIC
+        assert '"revision": 3,' in result.output
+
+    def test_yaml_output_parses_back_to_the_same_record(self, api: respx.MockRouter) -> None:
+        api.get(TOPICS_TSG_URL).mock(
+            return_value=httpx.Response(200, json={"custom_topics": [DETAILED_TOPIC]})
+        )
+
+        result = runner.invoke(topics_app, ["get", TOPIC_ID, "--output", "yaml"])
+
+        assert yaml.safe_load(result.output) == DETAILED_TOPIC
+
+    def test_yaml_output_survives_a_description_with_punctuation(
+        self, api: respx.MockRouter
+    ) -> None:
+        """Hand-written YAML breaks on a colon; the value must come back as it went in."""
+        awkward = {**TOPIC, "description": "Advice: buy, sell, or #hold"}
+        api.get(TOPICS_TSG_URL).mock(
+            return_value=httpx.Response(200, json={"custom_topics": [awkward]})
+        )
+
+        result = runner.invoke(topics_app, ["get", TOPIC_ID, "--output", "yaml"])
+
+        assert yaml.safe_load(result.output)["description"] == "Advice: buy, sell, or #hold"
+
+    def test_structured_output_drops_unset_fields(self, api: respx.MockRouter) -> None:
+        api.get(TOPICS_TSG_URL).mock(
+            return_value=httpx.Response(200, json={"custom_topics": [TOPIC]})
+        )
+
+        result = runner.invoke(topics_app, ["get", TOPIC_ID, "--output", "json"])
+
+        assert "created_by" not in json.loads(result.output)
+
+    def test_rejects_a_format_the_reference_does_not_offer(self, api: respx.MockRouter) -> None:
+        """`get` renders one record, so table and CSV are not on this command."""
+        route = api.get(TOPICS_TSG_URL).mock(
+            return_value=httpx.Response(200, json={"custom_topics": [TOPIC]})
+        )
+
+        result = runner.invoke(topics_app, ["get", TOPIC_ID, "--output", "table"])
+
+        assert result.exit_code == 2
+        assert not route.called
+
+    def test_pretty_output_opens_with_the_runtime_header(self, api: respx.MockRouter) -> None:
+        api.get(TOPICS_TSG_URL).mock(
+            return_value=httpx.Response(200, json={"custom_topics": [TOPIC]})
+        )
+
+        result = runner.invoke(topics_app, ["get", TOPIC_ID])
+
+        assert RUNTIME_HEADER in result.output
+
+    @pytest.mark.parametrize("fmt", ["json", "yaml"])
+    def test_structured_output_carries_no_header(self, api: respx.MockRouter, fmt: str) -> None:
+        api.get(TOPICS_TSG_URL).mock(
+            return_value=httpx.Response(200, json={"custom_topics": [TOPIC]})
+        )
+
+        result = runner.invoke(topics_app, ["get", TOPIC_ID, "--output", fmt])
+
+        assert RUNTIME_HEADER not in result.output
+
+    def test_an_api_failure_exits_two(self, api: respx.MockRouter) -> None:
+        api.get(TOPICS_TSG_URL).mock(
+            return_value=httpx.Response(403, json={"message": "Forbidden"})
+        )
+
+        result = runner.invoke(topics_app, ["get", TOPIC_ID])
+
+        assert result.exit_code == 2
+
+
+# ---------------------------------------------------------------------------
+# update
+# ---------------------------------------------------------------------------
+
+UPDATE_CONFIG = {
+    "topic_name": "Financial Advice",
+    "description": "Requests for personal investment advice",
+    "examples": ["Should I buy TSLA stock?", "How should I invest my savings?"],
+}
+
+
+class TestUpdate:
+    def test_sends_the_config_file_as_the_body(self, api: respx.MockRouter, tmp_path: Path) -> None:
+        route = api.put(TOPIC_UPDATE_URL).mock(return_value=httpx.Response(200, json=TOPIC))
+
+        result = runner.invoke(
+            topics_app,
+            ["update", TOPIC_ID, "--config", write_json(tmp_path, UPDATE_CONFIG)],
+        )
+
+        assert result.exit_code == 0
+        assert body_of(route) == UPDATE_CONFIG
+
+    def test_a_field_the_model_does_not_declare_still_reaches_the_api(
+        self, api: respx.MockRouter, tmp_path: Path
+    ) -> None:
+        """Validation must not silently drop what the service added since this release."""
+        config = {**UPDATE_CONFIG, "future_field": "keep me"}
+        route = api.put(TOPIC_UPDATE_URL).mock(return_value=httpx.Response(200, json=TOPIC))
+
+        result = runner.invoke(
+            topics_app, ["update", TOPIC_ID, "--config", write_json(tmp_path, config)]
+        )
+
+        assert result.exit_code == 0
+        assert body_of(route)["future_field"] == "keep me"
+
+    def test_reports_the_updated_topic(self, api: respx.MockRouter, tmp_path: Path) -> None:
+        api.put(TOPIC_UPDATE_URL).mock(return_value=httpx.Response(200, json=DETAILED_TOPIC))
+
+        result = runner.invoke(
+            topics_app, ["update", TOPIC_ID, "--config", write_json(tmp_path, UPDATE_CONFIG)]
+        )
+
+        assert "Topic updated" in result.output
+        assert TOPIC_ID in result.output
+        assert "Should I buy TSLA stock?" in result.output
+
+    def test_requires_the_config_flag(self, api: respx.MockRouter) -> None:
+        route = api.put(TOPIC_UPDATE_URL).mock(return_value=httpx.Response(200, json=TOPIC))
+
+        result = runner.invoke(topics_app, ["update", TOPIC_ID])
+
+        assert result.exit_code == 2
+        assert not route.called
+
+    def test_a_missing_config_file_exits_two(self, api: respx.MockRouter, tmp_path: Path) -> None:
+        route = api.put(TOPIC_UPDATE_URL).mock(return_value=httpx.Response(200, json=TOPIC))
+
+        result = runner.invoke(
+            topics_app, ["update", TOPIC_ID, "--config", str(tmp_path / "absent.json")]
+        )
+
+        assert result.exit_code == 2
+        assert not route.called
+
+    def test_a_config_that_is_not_json_exits_two(
+        self, api: respx.MockRouter, tmp_path: Path
+    ) -> None:
+        route = api.put(TOPIC_UPDATE_URL).mock(return_value=httpx.Response(200, json=TOPIC))
+
+        result = runner.invoke(
+            topics_app, ["update", TOPIC_ID, "--config", write_json(tmp_path, "not json {")]
+        )
+
+        assert result.exit_code == 2
+        assert not route.called
+        assert "not valid JSON" in result.output
+
+    def test_a_config_that_is_not_an_object_exits_two(
+        self, api: respx.MockRouter, tmp_path: Path
+    ) -> None:
+        route = api.put(TOPIC_UPDATE_URL).mock(return_value=httpx.Response(200, json=TOPIC))
+
+        result = runner.invoke(
+            topics_app, ["update", TOPIC_ID, "--config", write_json(tmp_path, [UPDATE_CONFIG])]
+        )
+
+        assert result.exit_code == 2
+        assert not route.called
+
+    def test_a_config_missing_the_topic_name_exits_two(
+        self, api: respx.MockRouter, tmp_path: Path
+    ) -> None:
+        """Reported against the file the user wrote, not as a 400 about a body they
+        never saw."""
+        route = api.put(TOPIC_UPDATE_URL).mock(return_value=httpx.Response(200, json=TOPIC))
+        config = {key: value for key, value in UPDATE_CONFIG.items() if key != "topic_name"}
+
+        result = runner.invoke(
+            topics_app, ["update", TOPIC_ID, "--config", write_json(tmp_path, config)]
+        )
+
+        assert result.exit_code == 2
+        assert not route.called
+        assert "topic_name" in result.output
+
+    def test_a_topic_id_that_is_not_a_uuid_exits_two(
+        self, api: respx.MockRouter, tmp_path: Path
+    ) -> None:
+        route = api.put(f"{TOPIC_URL}/uuid/Financial Advice").mock(
+            return_value=httpx.Response(200, json=TOPIC)
+        )
+
+        result = runner.invoke(
+            topics_app,
+            ["update", "Financial Advice", "--config", write_json(tmp_path, UPDATE_CONFIG)],
+        )
+
+        assert result.exit_code == 2
+        assert not route.called
+
+    def test_opens_with_the_runtime_header(self, api: respx.MockRouter, tmp_path: Path) -> None:
+        """`update` has no --output flag, so the reference prints the banner every time."""
+        api.put(TOPIC_UPDATE_URL).mock(return_value=httpx.Response(200, json=TOPIC))
+
+        result = runner.invoke(
+            topics_app, ["update", TOPIC_ID, "--config", write_json(tmp_path, UPDATE_CONFIG)]
+        )
+
+        assert RUNTIME_HEADER in result.output
+
+    def test_an_api_failure_exits_two(self, api: respx.MockRouter, tmp_path: Path) -> None:
+        api.put(TOPIC_UPDATE_URL).mock(return_value=httpx.Response(403, json={"message": "no"}))
+
+        result = runner.invoke(
+            topics_app, ["update", TOPIC_ID, "--config", write_json(tmp_path, UPDATE_CONFIG)]
+        )
+
+        assert result.exit_code == 2
+
+
+# ---------------------------------------------------------------------------
+# delete
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture
+def interactive(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Let the confirmation prompt believe there is someone at a terminal to answer it.
+
+    The whole ``sys`` reference inside the confirm module is replaced rather than
+    ``sys.stdin`` itself, because ``CliRunner`` swaps the real ``sys.stdin`` for its own
+    for the duration of the invocation.
+    """
+    monkeypatch.setattr(
+        confirm_module, "sys", SimpleNamespace(stdin=SimpleNamespace(isatty=lambda: True))
+    )
+
+
+class TestDelete:
+    def test_refuses_without_force_when_nobody_can_be_asked(self, api: respx.MockRouter) -> None:
+        """No TTY and no --force means the intent was never stated; deleting anyway is worse."""
+        plain = api.delete(TOPIC_DELETE_URL).mock(
+            return_value=httpx.Response(200, json={"message": "deleted"})
+        )
+        forced = api.delete(TOPIC_FORCE_URL).mock(
+            return_value=httpx.Response(200, json={"message": "deleted"})
+        )
+
+        result = runner.invoke(topics_app, ["delete", TOPIC_ID])
+
+        assert result.exit_code == 2
+        assert not plain.called
+        assert not forced.called
+
+    def test_force_takes_the_force_endpoint(self, api: respx.MockRouter) -> None:
+        """A different route, not a flag: the plain delete cannot detach referencing profiles."""
+        plain = api.delete(TOPIC_DELETE_URL).mock(
+            return_value=httpx.Response(200, json={"message": "deleted"})
+        )
+        forced = api.delete(TOPIC_FORCE_URL).mock(
+            return_value=httpx.Response(200, json={"message": "Topic removed from 2 profiles"})
+        )
+
+        result = runner.invoke(topics_app, ["delete", TOPIC_ID, "--force"])
+
+        assert result.exit_code == 0
+        assert not plain.called
+        assert url_of(forced) == TOPIC_FORCE_URL
+        assert "Topic removed from 2 profiles" in result.output
+
+    def test_rm_is_the_same_command(self, api: respx.MockRouter) -> None:
+        """The reference registers `delete|rm`; the alias must not be a different command."""
+        forced = api.delete(TOPIC_FORCE_URL).mock(
+            return_value=httpx.Response(200, json={"message": "deleted"})
+        )
+
+        result = runner.invoke(topics_app, ["rm", TOPIC_ID, "--force"])
+
+        assert result.exit_code == 0
+        assert forced.called
+
+    def test_updated_by_is_recorded_on_the_force_delete(self, api: respx.MockRouter) -> None:
+        forced = api.delete(TOPIC_FORCE_URL).mock(
+            return_value=httpx.Response(200, json={"message": "deleted"})
+        )
+
+        result = runner.invoke(
+            topics_app, ["delete", TOPIC_ID, "--force", "--updated-by", "ops@example.com"]
+        )
+
+        assert result.exit_code == 0
+        assert url_of(forced) == f"{TOPIC_FORCE_URL}?updated_by=ops%40example.com"
+
+    def test_no_updated_by_sends_no_such_parameter(self, api: respx.MockRouter) -> None:
+        """An empty audit field is not the same as no audit field."""
+        forced = api.delete(TOPIC_FORCE_URL).mock(
+            return_value=httpx.Response(200, json={"message": "deleted"})
+        )
+
+        runner.invoke(topics_app, ["delete", TOPIC_ID, "--force"])
+
+        assert "updated_by" not in url_of(forced)
+
+    def test_a_confirmed_delete_takes_the_plain_endpoint(
+        self, api: respx.MockRouter, interactive: None
+    ) -> None:
+        plain = api.delete(TOPIC_DELETE_URL).mock(
+            return_value=httpx.Response(200, json={"message": "deleted"})
+        )
+        forced = api.delete(TOPIC_FORCE_URL).mock(
+            return_value=httpx.Response(200, json={"message": "deleted"})
+        )
+
+        result = runner.invoke(topics_app, ["delete", TOPIC_ID], input="y\n")
+
+        assert result.exit_code == 0
+        assert url_of(plain) == TOPIC_DELETE_URL
+        assert not forced.called
+        assert f"Topic {TOPIC_ID} deleted." in result.output
+
+    def test_declining_deletes_nothing_and_exits_zero(
+        self, api: respx.MockRouter, interactive: None
+    ) -> None:
+        """Changing your mind is a valid outcome, not a failure the shell should flag."""
+        plain = api.delete(TOPIC_DELETE_URL).mock(
+            return_value=httpx.Response(200, json={"message": "deleted"})
+        )
+
+        result = runner.invoke(topics_app, ["delete", TOPIC_ID], input="n\n")
+
+        assert result.exit_code == 0
+        assert not plain.called
+
+    def test_the_prompt_names_the_topic(self, api: respx.MockRouter, interactive: None) -> None:
+        api.delete(TOPIC_DELETE_URL).mock(
+            return_value=httpx.Response(200, json={"message": "deleted"})
+        )
+
+        result = runner.invoke(topics_app, ["delete", TOPIC_ID], input="y\n")
+
+        assert f"Delete topic {TOPIC_ID}?" in result.output
+
+    def test_a_topic_id_that_is_not_a_uuid_exits_two(self, api: respx.MockRouter) -> None:
+        route = api.delete(f"{TOPIC_URL}/force/Financial Advice").mock(
+            return_value=httpx.Response(200, json={"message": "deleted"})
+        )
+
+        result = runner.invoke(topics_app, ["delete", "Financial Advice", "--force"])
+
+        assert result.exit_code == 2
+        assert not route.called
+
+    def test_opens_with_the_runtime_header(self, api: respx.MockRouter) -> None:
+        """`delete` has no --output flag, so the reference prints the banner every time."""
+        api.delete(TOPIC_FORCE_URL).mock(
+            return_value=httpx.Response(200, json={"message": "deleted"})
+        )
+
+        result = runner.invoke(topics_app, ["delete", TOPIC_ID, "--force"])
+
+        assert RUNTIME_HEADER in result.output
+
+    def test_a_conflict_exits_two(self, api: respx.MockRouter, interactive: None) -> None:
+        """The plain delete fails while a profile still references the topic; that is the point."""
+        api.delete(TOPIC_DELETE_URL).mock(
+            return_value=httpx.Response(409, json={"message": "still referenced"})
+        )
+
+        result = runner.invoke(topics_app, ["delete", TOPIC_ID], input="y\n")
 
         assert result.exit_code == 2
