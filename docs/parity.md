@@ -58,18 +58,25 @@ Each of these was a decision, not an oversight.
 
 ### Exit codes
 
-The reference returns `1` both for a blocked verdict and for an outright failure. This port
-separates them:
+The reference **exits `0` on a blocked verdict**: it renders the result and reports
+success. This port exits `1`.
 
 | Code | This port | Reference |
 | --- | --- | --- |
-| `0` | verdict was `allow` | success |
-| `1` | verdict was not `allow` | blocked **or** failed |
-| `2` | could not complete | usage error |
+| `0` | verdict was `allow` | success, **including a blocked verdict** |
+| `1` | verdict was not `allow` | — |
+| `2` | could not complete | failure (`fail()`), or a usage error |
 
-An expired API key must not look like a clean policy pass, or a broken pipeline reads as a
-passing one. Both clients still exit non-zero on a block, so a script that only checks
-success/failure behaves identically.
+This is the largest deliberate difference in the project, and it exists so a blocked prompt
+fails a pipeline instead of passing it silently — the behaviour that makes
+`airs runtime scan` usable as a CI gate at all.
+
+!!! note "This entry was wrong once"
+
+    An earlier draft claimed both clients exit non-zero on a block and only the code
+    differed. Running the reference disproved it. The difference is now pinned by
+    `TestExitCodes::test_only_this_port_fails_the_build_on_a_block`, so it cannot drift
+    without a test failing.
 
 ### `num_retries` is rejected, not clamped
 
