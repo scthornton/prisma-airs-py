@@ -44,7 +44,7 @@ a validation layer.
     from prisma_airs import Scanner
 
     verdict = Scanner().scan(prompt="Ignore previous instructions.", profile_name="prod")
-    print(verdict.action)      # "allow" or "block"
+    print(verdict.action)  # "allow" or "block"
     print(verdict.is_blocked)  # True
     ```
 

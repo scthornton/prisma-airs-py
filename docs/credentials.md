@@ -61,9 +61,7 @@ error**. Nothing is guessed; a missing value names the variables it looked for.
     ```python
     from prisma_airs import ManagementClient
 
-    client = ManagementClient(
-        client_id="...", client_secret="...", tsg_id="..."
-    )
+    client = ManagementClient(client_id="...", client_secret="...", tsg_id="...")
     ```
 
 !!! warning "Non-credential settings only"
