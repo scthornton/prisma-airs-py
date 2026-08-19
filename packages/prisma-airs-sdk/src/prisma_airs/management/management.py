@@ -1010,8 +1010,8 @@ class ManagementClient:
     Example:
         >>> mgmt = ManagementClient()  # reads PANW_MGMT_* from the environment
         >>> page = mgmt.profiles.list(limit=5)
-        >>> [p.profile_name for p in page.ai_profiles]
-        ['prod']
+        >>> page.ai_profiles[0].profile_name
+        'prod'
     """
 
     def __init__(
