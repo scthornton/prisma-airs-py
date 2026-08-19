@@ -62,6 +62,19 @@ class TestContent:
         with pytest.raises(ValidationError, match="exceeds max length"):
             Content(prompt=emoji * (MAX_CONTENT_PROMPT_LENGTH // 4 + 1))
 
+    def test_an_empty_prompt_is_nothing_to_scan(self) -> None:
+        """Verified against the reference, which refuses `scan --profile p ""` identically.
+
+        Tempting to treat "" as supplied-but-empty and send it. The reference does not,
+        and a differential test caught the divergence when this port briefly did.
+        """
+        with pytest.raises(ValidationError, match="At least one of"):
+            Content(prompt="")
+
+    def test_an_empty_response_is_also_nothing_to_scan(self) -> None:
+        with pytest.raises(ValidationError, match="At least one of"):
+            Content(response="")
+
     def test_accepts_content_exactly_at_the_ceiling(self) -> None:
         assert Content(prompt="x" * MAX_CONTENT_PROMPT_LENGTH) is not None
 
