@@ -72,15 +72,37 @@ uv sync                 # create the environment
 uv run pytest           # unit and contract tests -- no credentials needed
 uv run ruff check .
 uv run mypy .
+uv run --group docs mkdocs serve
 ```
 
 Tests are layered so that most of the suite runs anywhere:
 
 - **Unit** — pure logic; no network.
 - **Contract** — `respx`-mocked HTTP asserting exact URLs, headers, and bodies.
-- **Parity** (`-m parity`) — differential tests against the TypeScript reference
-  implementation, confirming both clients produce byte-identical requests.
+- **Parity** (`-m parity`) — both CLIs run as real processes against one recording server,
+  and their requests, exit codes, and command trees are compared. Needs Node and a built
+  checkout of the reference:
+
+  ```bash
+  git clone https://github.com/cdot65/prisma-airs-cli && cd prisma-airs-cli
+  npm install && npm run build
+  AIRS_PARITY=1 AIRS_REFERENCE_CLI=$PWD/dist/cli/index.js uv run pytest -m parity
+  ```
+
 - **Live** (`-m live`) — real API calls; requires credentials, skipped by default.
+
+The parity tier is the one that earns its keep. Unit and contract tests prove the client
+does what *its author believed* the API expects; parity proves it does what the reference
+actually does. Every serious defect found in this port so far was found by that difference.
+
+## Documentation
+
+Full documentation, including the credential model and a page on every deliberate
+difference from the TypeScript client, is built with MkDocs:
+
+```bash
+uv run --group docs mkdocs serve
+```
 
 ## Acknowledgement
 
