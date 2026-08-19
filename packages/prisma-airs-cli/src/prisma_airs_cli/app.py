@@ -15,10 +15,13 @@ import typer
 
 from prisma_airs_cli import __version__
 from prisma_airs_cli.commands.aigateway import aigateway_app
+from prisma_airs_cli.commands.apikeys import apikeys_app, deployment_profiles_app
 from prisma_airs_cli.commands.config import config_app
+from prisma_airs_cli.commands.customerapps import customerapps_app, scanlogs_app
 from prisma_airs_cli.commands.dlp import dlp_app
 from prisma_airs_cli.commands.modelsecurity import modelsecurity_app
 from prisma_airs_cli.commands.ops import backup, completion, doctor, restore
+from prisma_airs_cli.commands.profiles import profiles_app
 from prisma_airs_cli.commands.redteam import redteam_app
 from prisma_airs_cli.commands.runtime import runtime_app
 from prisma_airs_cli.commands.topics import topics_app
@@ -30,8 +33,13 @@ app = typer.Typer(
     context_settings={"help_option_names": ["-h", "--help"]},
 )
 
-# The reference nests these under `runtime`; they live in their own modules only because
-# of their size.
+# Everything the reference registers under `runtime`. These live in their own modules only
+# because of their size; the command path is what has to match.
+runtime_app.add_typer(apikeys_app)
+runtime_app.add_typer(customerapps_app)
+runtime_app.add_typer(deployment_profiles_app)
+runtime_app.add_typer(profiles_app)
+runtime_app.add_typer(scanlogs_app)
 runtime_app.add_typer(topics_app)
 runtime_app.add_typer(dlp_app)
 
