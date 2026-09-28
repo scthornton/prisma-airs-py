@@ -87,7 +87,7 @@ jobs:
     permissions:
       id-token: write  # PyPI trusted publishing; no long-lived token to leak
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: distributions
           path: dist
@@ -108,7 +108,7 @@ jobs:
     permissions:
       id-token: write
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: distributions
           path: dist
