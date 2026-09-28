@@ -34,9 +34,13 @@ jobs:
 
       # The published npm package exposes an older command surface than the repository
       # source at the same version, so the reference has to be built from source.
+      # Pinned to the release this port's command surface was built against. Tracking main
+      # broke when 6.0.0 dropped environment-variable config for tenant files (the reference
+      # then ignores the recorder endpoint this harness sets). Move the pin forward only
+      # together with the port work that closes the gap to the newer release.
       - name: Build the reference CLI
         run: |
-          git clone --depth 1 https://github.com/cdot65/prisma-airs-cli.git "$RUNNER_TEMP/reference"
+          git clone --depth 1 --branch v4.2.0 https://github.com/cdot65/prisma-airs-cli.git "$RUNNER_TEMP/reference"
           cd "$RUNNER_TEMP/reference"
           npm install --no-audit --no-fund
           npm run build
